@@ -25,13 +25,18 @@ export class PersonaService {
 
   @ApiOperation({ summary: "Obtener todas las personas" })
   async findAll(): Promise<Persona[]> {
-    const personas = await this.personaRepository.find();
+    const personas = await this.personaRepository.find({
+      relations: ["roles", "roles.rol"],
+    });
     return personas.map((persona) => this.withoutPassword(persona));
   }
 
   @ApiOperation({ summary: "Obtener una persona por ID" })
   async findOne(id: number): Promise<Persona> {
-    const persona = await this.personaRepository.findOne({ where: { id } });
+    const persona = await this.personaRepository.findOne({
+      where: { id },
+      relations: ["roles", "roles.rol"],
+    });
     return persona ? this.withoutPassword(persona) : persona;
   }
 

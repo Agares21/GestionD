@@ -1,4 +1,5 @@
 import React from "react";
+import { X } from "lucide-react";
 
 interface ModalProps {
   isOpen: boolean;
@@ -27,30 +28,26 @@ const Modal: React.FC<ModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black bg-opacity-50"
+        className="absolute inset-0 bg-gray-950/55 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Modal */}
       <div
-        className={`relative bg-white rounded-lg shadow-xl ${sizeClasses[size]} w-full mx-4`}
+        className={`relative w-full mx-4 overflow-hidden rounded-lg bg-white shadow-2xl ring-1 ring-gray-900/10 ${sizeClasses[size]}`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50/80 p-6">
           <h2 className="text-xl font-bold text-gray-900">{title}</h2>
           {closeButton && (
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-white hover:text-gray-700"
             >
-              ✕
+              <X size={18} />
             </button>
           )}
         </div>
 
-        {/* Content */}
         <div className="p-6">{children}</div>
       </div>
     </div>

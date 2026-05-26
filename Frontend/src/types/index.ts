@@ -65,6 +65,7 @@ export interface Persona {
   email: string;
   telefono: string;
   genero: string;
+  roles?: UserRole[];
 }
 
 export interface Disciplina {

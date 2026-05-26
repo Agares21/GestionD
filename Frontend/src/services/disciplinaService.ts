@@ -1,18 +1,11 @@
 import { apiClient } from "./api";
 import { Disciplina, PaginatedResponse } from "@types";
+import { normalizeText } from "@utils/text";
 
 export interface Carrera {
   id: number;
   nombre: string;
 }
-
-const normalizeText = (value = "") =>
-  value
-    .replace(/FÃºtbol/g, "F\u00fatbol")
-    .replace(/BÃ¡squetbol/g, "B\u00e1squetbol")
-    .replace(/VÃ³ley/g, "V\u00f3ley")
-    .replace(/GestiÃ³n/g, "Gesti\u00f3n")
-    .replace(/ConfiguraciÃ³n/g, "Configuraci\u00f3n");
 
 const toDisciplina = (disciplina: Disciplina): Disciplina => ({
   ...disciplina,
@@ -25,7 +18,10 @@ export const disciplinaService = {
   async obtenerDisciplinas(
     params?: any,
   ): Promise<PaginatedResponse<Disciplina>> {
-    const response = await apiClient.getPaginated<Disciplina>("/disciplina", params);
+    const response = await apiClient.getPaginated<Disciplina>(
+      "/disciplina",
+      params,
+    );
     return {
       ...response,
       data: response.data.map(toDisciplina),
@@ -60,6 +56,13 @@ export const disciplinaService = {
 
 export const carreraService = {
   async obtenerCarreras(params?: any): Promise<PaginatedResponse<Carrera>> {
-    return apiClient.getPaginated<Carrera>("/carrera", params);
+    const response = await apiClient.getPaginated<Carrera>("/carrera", params);
+    return {
+      ...response,
+      data: response.data.map((carrera) => ({
+        ...carrera,
+        nombre: normalizeText(carrera.nombre),
+      })),
+    };
   },
 };

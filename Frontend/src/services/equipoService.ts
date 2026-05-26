@@ -1,10 +1,13 @@
 import { apiClient } from "./api";
 import { Equipo, PaginatedResponse } from "@types";
+import { normalizeText } from "@utils/text";
 
 const toEquipo = (equipo: any): Equipo => ({
   ...equipo,
-  nombre: equipo.nombre ?? equipo.nombre_equipo,
-  categoria: equipo.categoria ?? equipo.disciplina?.nombre ?? "General",
+  nombre: normalizeText(equipo.nombre ?? equipo.nombre_equipo),
+  categoria: normalizeText(
+    equipo.categoria ?? equipo.disciplina?.nombre ?? "General",
+  ),
   cantidad_jugadores: equipo.cantidad_jugadores ?? equipo.jugadores?.length ?? 0,
   estado: equipo.estado ?? "registrado",
 });

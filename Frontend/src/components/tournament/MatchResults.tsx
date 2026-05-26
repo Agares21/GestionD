@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Partido } from "@types";
 import { useTournamentStore } from "@store/tournamentStore";
 import { Button, Input, Modal, Card, Table, Select } from "@components/common";
-import { Edit2, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Edit2, Plus, Trash2 } from "lucide-react";
 import { equipoService } from "@services/equipoService";
 import { torneoService } from "@services/tournamentService";
 
@@ -12,14 +12,153 @@ const MatchResultsList: React.FC = () => {
     isLoading,
     obtenerPartidos,
     registrarResultado,
+  } =
+    useTournamentStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<Partido | null>(null);
+
+  useEffect(() => {
+    obtenerPartidos();
+  }, [obtenerPartidos]);
+
+  const finishedMatches = partidos.filter(
+    (partido) => partido.estado === "finalizado" || partido.resultado,
+  );
+  const pendingMatches = partidos.filter(
+    (partido) => partido.estado !== "finalizado" && !partido.resultado,
+  );
+
+  const columns = [
+    {
+      key: "fecha",
+      title: "Fecha",
+      render: (_value: string, record: Partido) => (
+        <div>
+          <p className="font-semibold text-gray-900">{record.fecha || "-"}</p>
+          <p className="text-xs text-gray-500">{record.hora || "Sin hora"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "partido",
+      title: "Partido",
+      render: (_value: unknown, record: Partido) => (
+        <div className="font-medium text-gray-900">
+          {record.equipo_local?.nombre || "Equipo local"} vs{" "}
+          {record.equipo_visitante?.nombre || "Equipo visitante"}
+        </div>
+      ),
+    },
+    {
+      key: "resultado",
+      title: "Resultado",
+      render: (_value: unknown, record: Partido) =>
+        record.resultado ? (
+          <span className="text-lg font-bold text-gray-900">
+            {record.resultado.goles_local} - {record.resultado.goles_visitante}
+          </span>
+        ) : (
+          <span className="text-sm text-gray-500">Pendiente</span>
+        ),
+    },
+    {
+      key: "estado",
+      title: "Estado",
+      render: (value: string) => (
+        <span
+          className={`px-3 py-1 rounded-full text-sm font-medium ${
+            value === "finalizado"
+              ? "bg-green-100 text-green-800"
+              : value === "en_curso"
+                ? "bg-blue-100 text-blue-800"
+                : "bg-amber-100 text-amber-800"
+          }`}
+        >
+          {value}
+        </span>
+      ),
+    },
+    {
+      key: "acciones",
+      title: "Acciones",
+      render: (_value: unknown, record: Partido) => (
+        <Button
+          size="sm"
+          variant={record.estado === "finalizado" ? "secondary" : "primary"}
+          onClick={() => {
+            setSelectedMatch(record);
+            setIsModalOpen(true);
+          }}
+        >
+          {record.estado === "finalizado" ? "Editar resultado" : "Registrar"}
+        </Button>
+      ),
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Resultados</h1>
+          <p className="text-gray-600">
+            Registra marcadores y revisa los partidos finalizados.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:flex">
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase text-green-700">
+              Finalizados
+            </p>
+            <p className="text-2xl font-bold text-green-900">
+              {finishedMatches.length}
+            </p>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase text-amber-700">
+              Pendientes
+            </p>
+            <p className="text-2xl font-bold text-amber-900">
+              {pendingMatches.length}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Card>
+        <Table columns={columns} data={partidos} isLoading={isLoading} />
+      </Card>
+
+      <ResultadoModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedMatch(null);
+        }}
+        partido={selectedMatch}
+        onSubmit={async (datos) => {
+          if (selectedMatch) {
+            await registrarResultado(selectedMatch.id, datos);
+            setIsModalOpen(false);
+            obtenerPartidos();
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+export const FixtureList: React.FC = () => {
+  const {
+    partidos,
+    isLoading,
+    obtenerPartidos,
     crearPartido,
     actualizarPartido,
     eliminarPartido,
   } =
     useTournamentStore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState<Partido | null>(null);
   const [editingFixture, setEditingFixture] = useState<Partido | null>(null);
 
   useEffect(() => {
@@ -40,6 +179,19 @@ const MatchResultsList: React.FC = () => {
     {
       key: "fecha",
       title: "Fecha",
+      render: (_value: string, record: Partido) => (
+        <div className="flex items-center gap-2 text-gray-700">
+          <CalendarDays size={16} className="text-primary-600" />
+          <span>{record.fecha || "Sin fecha"}</span>
+          {record.hora && <span className="text-gray-500">{record.hora}</span>}
+        </div>
+      ),
+    },
+    {
+      key: "cancha",
+      title: "Cancha",
+      render: (_value: unknown, record: Partido) =>
+        record.cancha?.nombre || "Sin cancha",
     },
     {
       key: "estado",
@@ -63,16 +215,6 @@ const MatchResultsList: React.FC = () => {
       title: "Acciones",
       render: (_value: unknown, record: Partido) => (
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant={record.estado === "finalizado" ? "secondary" : "primary"}
-            onClick={() => {
-              setSelectedMatch(record);
-              setIsModalOpen(true);
-            }}
-          >
-            {record.estado === "finalizado" ? "Resultado" : "Registrar"}
-          </Button>
           <Button
             size="sm"
             variant="secondary"
@@ -101,10 +243,13 @@ const MatchResultsList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">
-          Resultados de Partidos
-        </h1>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Fixture</h1>
+          <p className="text-gray-600">
+            Programa partidos, fechas, horarios y sedes del torneo.
+          </p>
+        </div>
         <Button
           variant="primary"
           className="gap-2"
@@ -121,22 +266,6 @@ const MatchResultsList: React.FC = () => {
       <Card>
         <Table columns={columns} data={partidos} isLoading={isLoading} />
       </Card>
-
-      <ResultadoModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedMatch(null);
-        }}
-        partido={selectedMatch}
-        onSubmit={async (datos) => {
-          if (selectedMatch) {
-            await registrarResultado(selectedMatch.id, datos);
-            setIsModalOpen(false);
-            obtenerPartidos();
-          }
-        }}
-      />
 
       <FixtureModal
         isOpen={isFixtureModalOpen}

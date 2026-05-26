@@ -4,7 +4,7 @@ import { Layout } from "@components/layout";
 import { Button, Card, Input, Modal, Select, Table } from "@components/common";
 import { jugadorService, personaService } from "@services/playerService";
 import { equipoService } from "@services/equipoService";
-import { Equipo, Persona } from "@types";
+import { Equipo, Persona, UserRole } from "@types";
 
 const emptyForm = {
   nombre: "",
@@ -13,6 +13,16 @@ const emptyForm = {
   email: "",
   celular: "",
   equipo_id: "",
+};
+
+const canAppearAsPlayer = (persona: Persona, equipo?: string) => {
+  const roles = persona.roles || [];
+  const isAdminOrDelegate = roles.some((role) =>
+    [UserRole.ADMIN, UserRole.DELEGADO].includes(role),
+  );
+  const isPlayer = roles.includes(UserRole.JUGADOR) || Boolean(equipo && equipo !== "-");
+
+  return isPlayer && !isAdminOrDelegate;
 };
 
 const PlayersPage: React.FC = () => {
@@ -34,7 +44,6 @@ const PlayersPage: React.FC = () => {
         equipoService.obtenerEquipos(),
       ]);
 
-      setPersonas(response.data);
       setEquipos(equiposResponse.data);
 
       const relaciones = await Promise.all(
@@ -45,8 +54,14 @@ const PlayersPage: React.FC = () => {
           return [persona.id, equiposJugador[0]?.nombre ?? "-"] as const;
         }),
       );
+      const equiposPorPersona = Object.fromEntries(relaciones);
 
-      setEquiposPorJugador(Object.fromEntries(relaciones));
+      setPersonas(
+        response.data.filter((persona) =>
+          canAppearAsPlayer(persona, equiposPorPersona[persona.id]),
+        ),
+      );
+      setEquiposPorJugador(equiposPorPersona);
     } finally {
       setIsLoading(false);
     }
@@ -96,9 +111,11 @@ const PlayersPage: React.FC = () => {
 
     if (editingId) {
       await personaService.actualizarPersona(editingId, payload);
+      await personaService.asignarRolJugador(editingId);
       await jugadorService.asignarJugadorAEquipo(editingId, equipoId);
     } else {
       const created = await personaService.crearPersona(payload);
+      await personaService.asignarRolJugador(created.id);
       await jugadorService.asignarJugadorAEquipo(created.id, equipoId);
     }
 
@@ -138,7 +155,7 @@ const PlayersPage: React.FC = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">
-            Gestion de Jugadores
+            Gestión de Jugadores
           </h1>
           <Button variant="primary" onClick={openCreate} className="gap-2">
             <Plus size={20} />

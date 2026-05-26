@@ -16,6 +16,7 @@ import {
   PlayersPage,
   ReservationsPage,
   TournamentsPage,
+  FixturePage,
   ResultsPage,
   AdminPage,
   CMSPage,
@@ -79,6 +80,15 @@ const App: React.FC = () => {
           element={
             <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
               <TournamentsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/fixture"
+          element={
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
+              <FixturePage />
             </ProtectedRoute>
           }
         />

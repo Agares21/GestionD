@@ -1,24 +1,55 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Layout } from "@components/layout";
 import { useAuthStore } from "@store/authStore";
 import { Card, Table } from "@components/common";
-import { Users, Trophy, Calendar, BarChart3, MapPin, Clock } from "lucide-react";
-import { Equipo, Partido, Reserva, UserRole } from "@types";
+import {
+  BarChart3,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  Trophy,
+  Users,
+} from "lucide-react";
+import { Cancha, Equipo, Partido, Reserva, Torneo, UserRole } from "@types";
+import { equipoService } from "@services/equipoService";
 import { jugadorService } from "@services/playerService";
-import { partidoService } from "@services/tournamentService";
-import { reservaService } from "@services/fieldService";
+import { partidoService, torneoService } from "@services/tournamentService";
+import { canchaService, reservaService } from "@services/fieldService";
+
+const toDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDate = (date?: string) => {
+  if (!date) return "Sin fecha";
+  return new Date(`${date}T00:00:00`).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 const Dashboard: React.FC = () => {
   const { usuario } = useAuthStore();
   const [equiposJugador, setEquiposJugador] = useState<Equipo[]>([]);
   const [partidosJugador, setPartidosJugador] = useState<Partido[]>([]);
   const [reservasJugador, setReservasJugador] = useState<Reserva[]>([]);
+  const [equipos, setEquipos] = useState<Equipo[]>([]);
+  const [torneos, setTorneos] = useState<Torneo[]>([]);
+  const [partidos, setPartidos] = useState<Partido[]>([]);
+  const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [canchas, setCanchas] = useState<Cancha[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
 
   const isOnlyPlayer =
-    usuario?.roles.includes(UserRole.JUGADOR) &&
-    !usuario.roles.some((role) =>
+    Boolean(usuario?.roles.includes(UserRole.JUGADOR)) &&
+    !usuario?.roles.some((role) =>
       [UserRole.ADMIN, UserRole.DELEGADO, UserRole.ENTRENADOR].includes(role),
     );
 
@@ -28,29 +59,32 @@ const Dashboard: React.FC = () => {
 
       setIsPlayerLoading(true);
       try {
-        const equipos = await jugadorService.obtenerEquiposPorJugador(usuario.id);
+        const equiposAsignados = await jugadorService.obtenerEquiposPorJugador(
+          usuario.id,
+        );
         const [partidosResponse, reservasResponse] = await Promise.all([
           partidoService.obtenerPartidos(),
           reservaService.obtenerReservas(),
         ]);
-        const equipoIds = new Set(equipos.map((equipo) => equipo.id));
+        const equipoIds = new Set(equiposAsignados.map((equipo) => equipo.id));
 
-        const partidos = partidosResponse.data.filter((partido) => {
+        setEquiposJugador(equiposAsignados);
+        setPartidosJugador(
+          partidosResponse.data.filter((partido) => {
             const localId =
               (partido as any).equipo_local_id ?? partido.equipo_local?.id;
             const visitanteId =
-              (partido as any).equipo_visitante_id ?? partido.equipo_visitante?.id;
-
+              (partido as any).equipo_visitante_id ??
+              partido.equipo_visitante?.id;
             return equipoIds.has(localId) || equipoIds.has(visitanteId);
-        });
-        const reservas = reservasResponse.data.filter((reserva) => {
-          const equipoId = (reserva as any).equipo_id ?? reserva.equipo?.id;
-          return equipoIds.has(equipoId);
-        });
-
-        setEquiposJugador(equipos);
-        setPartidosJugador(partidos);
-        setReservasJugador(reservas);
+          }),
+        );
+        setReservasJugador(
+          reservasResponse.data.filter((reserva) => {
+            const equipoId = (reserva as any).equipo_id ?? reserva.equipo?.id;
+            return equipoIds.has(equipoId);
+          }),
+        );
       } finally {
         setIsPlayerLoading(false);
       }
@@ -59,32 +93,136 @@ const Dashboard: React.FC = () => {
     loadPlayerData();
   }, [usuario, isOnlyPlayer]);
 
-  const toDateKey = (date: Date) => date.toISOString().split("T")[0];
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!usuario || isOnlyPlayer) return;
+
+      setIsDashboardLoading(true);
+      try {
+        const [
+          equiposResponse,
+          torneosResponse,
+          partidosResponse,
+          reservasResponse,
+          canchasResponse,
+        ] = await Promise.all([
+          equipoService.obtenerEquipos(),
+          torneoService.obtenerTorneos(),
+          partidoService.obtenerPartidos(),
+          reservaService.obtenerReservas(),
+          canchaService.obtenerCanchas(),
+        ]);
+
+        setEquipos(equiposResponse.data);
+        setTorneos(torneosResponse.data);
+        setPartidos(partidosResponse.data);
+        setReservas(reservasResponse.data);
+        setCanchas(canchasResponse.data);
+      } finally {
+        setIsDashboardLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [usuario, isOnlyPlayer]);
+
   const selectedDateKey = toDateKey(selectedDate);
-  const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-  const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+  const todayKey = toDateKey(new Date());
+  const currentMonth = todayKey.slice(0, 7);
+
+  const monthStart = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth(),
+    1,
+  );
+  const monthEnd = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth() + 1,
+    0,
+  );
   const calendarOffset = (monthStart.getDay() + 6) % 7;
   const calendarCells = Array.from(
     { length: calendarOffset + monthEnd.getDate() },
     (_, index) => {
       if (index < calendarOffset) return null;
-      return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), index - calendarOffset + 1);
+      return new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        index - calendarOffset + 1,
+      );
     },
   );
+
+  const adminMetrics = useMemo(() => {
+    const reservasEsteMes = reservas.filter((reserva) =>
+      reserva.fecha?.startsWith(currentMonth),
+    );
+    const partidosFinalizados = partidos.filter(
+      (partido) => partido.estado === "finalizado" || partido.resultado,
+    );
+    const torneosActivos = torneos.filter((torneo) =>
+      ["planeado", "en_curso"].includes(torneo.estado),
+    );
+    const canchasDisponibles = canchas.filter(
+      (cancha) => cancha.estado === "disponible",
+    );
+
+    return {
+      reservasEsteMes,
+      partidosFinalizados,
+      torneosActivos,
+      canchasDisponibles,
+    };
+  }, [canchas, currentMonth, partidos, reservas, torneos]);
+
+  const proximosPartidos = useMemo(
+    () =>
+      [...partidos]
+        .filter((partido) => !partido.fecha || partido.fecha >= todayKey)
+        .sort((a, b) =>
+          `${a.fecha || "9999-12-31"} ${a.hora || ""}`.localeCompare(
+            `${b.fecha || "9999-12-31"} ${b.hora || ""}`,
+          ),
+        )
+        .slice(0, 6),
+    [partidos, todayKey],
+  );
+
+  const proximasReservas = useMemo(
+    () =>
+      [...reservas]
+        .filter(
+          (reserva) => reserva.estado !== "cancelada" && reserva.fecha >= todayKey,
+        )
+        .sort((a, b) =>
+          `${a.fecha} ${a.hora_inicio}`.localeCompare(
+            `${b.fecha} ${b.hora_inicio}`,
+          ),
+        )
+        .slice(0, 6),
+    [reservas, todayKey],
+  );
+
   const selectedDayMatches = partidosJugador.filter(
     (partido) => partido.fecha === selectedDateKey,
   );
   const selectedDayReservations = reservasJugador.filter(
     (reserva) => reserva.fecha === selectedDateKey,
   );
-  const nextMatches = [...partidosJugador]
-    .filter((partido) => !partido.fecha || partido.fecha >= selectedDateKey)
-    .sort((a, b) => `${a.fecha} ${a.hora}`.localeCompare(`${b.fecha} ${b.hora}`))
-    .slice(0, 5);
-  const nextReservations = [...reservasJugador]
-    .filter((reserva) => reserva.estado !== "cancelada" && reserva.fecha >= selectedDateKey)
+  const nextPlayerMatches = [...partidosJugador]
+    .filter((partido) => !partido.fecha || partido.fecha >= todayKey)
     .sort((a, b) =>
-      `${a.fecha} ${a.hora_inicio}`.localeCompare(`${b.fecha} ${b.hora_inicio}`),
+      `${a.fecha || "9999-12-31"} ${a.hora || ""}`.localeCompare(
+        `${b.fecha || "9999-12-31"} ${b.hora || ""}`,
+      ),
+    )
+    .slice(0, 5);
+  const nextPlayerReservations = [...reservasJugador]
+    .filter((reserva) => reserva.estado !== "cancelada" && reserva.fecha >= todayKey)
+    .sort((a, b) =>
+      `${a.fecha} ${a.hora_inicio}`.localeCompare(
+        `${b.fecha} ${b.hora_inicio}`,
+      ),
     )
     .slice(0, 5);
 
@@ -100,77 +238,51 @@ const Dashboard: React.FC = () => {
     return (
       <Layout>
         <div className="space-y-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              Bienvenido, {usuario?.nombre}
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Consulta tu equipo, tus partidos y las reservas de cancha.
-            </p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
-              {selectedDate.toLocaleDateString("es-ES", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
-              })}
-            </div>
+          <Hero
+            eyebrow="Mi calendario deportivo"
+            title={`Bienvenido, ${usuario?.nombre ?? "jugador"}`}
+            description="Consulta tus partidos, reservas y equipo asignado con datos actualizados."
+            aside={
+              <div className="space-y-3">
+                <MiniMetric label="Equipo" value={equiposJugador[0]?.nombre ?? "Sin equipo"} />
+                <MiniMetric label="Partidos próximos" value={nextPlayerMatches.length} />
+                <MiniMetric label="Reservas próximas" value={nextPlayerReservations.length} />
+              </div>
+            }
+          />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <StatCard label="Mi equipo" value={equiposJugador[0]?.nombre ?? "Sin equipo"} icon={Users} color="bg-sky-50 text-sky-700 border-sky-100" />
+            <StatCard label="Partidos" value={partidosJugador.length} icon={Trophy} color="bg-amber-50 text-amber-700 border-amber-100" />
+            <StatCard label="Reservas" value={reservasJugador.length} icon={MapPin} color="bg-emerald-50 text-emerald-700 border-emerald-100" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.25fr_0.75fr]">
             <Card>
-              <div className="flex items-center justify-between">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Mi equipo</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {equiposJugador[0]?.nombre ?? "Sin equipo"}
+                  <h2 className="text-xl font-bold text-gray-900">Calendario</h2>
+                  <p className="text-sm text-gray-500">
+                    Partidos y reservas de tu equipo.
                   </p>
                 </div>
-                <Users className="text-blue-600" size={28} />
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Partidos</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {partidosJugador.length}
-                  </p>
-                </div>
-                <Trophy className="text-amber-600" size={28} />
-              </div>
-            </Card>
-            <Card>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Reservas</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">
-                    {reservasJugador.length}
-                  </p>
-                </div>
-                <MapPin className="text-emerald-600" size={28} />
-              </div>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-[1.25fr_0.75fr] gap-6">
-            <Card>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
-                <h2 className="text-xl font-bold text-gray-900">Calendario</h2>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold"
                     onClick={() =>
                       setSelectedDate(
-                        new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1),
+                        new Date(
+                          selectedDate.getFullYear(),
+                          selectedDate.getMonth() - 1,
+                          1,
+                        ),
                       )
                     }
                   >
                     Anterior
                   </button>
-                  <span className="min-w-36 text-center font-semibold text-gray-800 capitalize">
+                  <span className="min-w-36 text-center font-semibold capitalize text-gray-800">
                     {selectedDate.toLocaleDateString("es-ES", {
                       month: "long",
                       year: "numeric",
@@ -178,10 +290,14 @@ const Dashboard: React.FC = () => {
                   </span>
                   <button
                     type="button"
-                    className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium"
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold"
                     onClick={() =>
                       setSelectedDate(
-                        new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1),
+                        new Date(
+                          selectedDate.getFullYear(),
+                          selectedDate.getMonth() + 1,
+                          1,
+                        ),
                       )
                     }
                   >
@@ -190,15 +306,20 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-gray-500 mb-2">
-                {["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"].map((day) => (
+              <div className="mb-2 grid grid-cols-7 gap-2 text-center text-xs font-bold text-gray-500">
+                {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((day) => (
                   <div key={day}>{day}</div>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-2">
                 {calendarCells.map((date, index) => {
                   if (!date) {
-                    return <div key={`empty-${index}`} className="h-24 rounded-lg bg-gray-50" />;
+                    return (
+                      <div
+                        key={`empty-${index}`}
+                        className="h-24 rounded-lg bg-gray-50"
+                      />
+                    );
                   }
 
                   const events = getEventsForDate(date);
@@ -220,12 +341,12 @@ const Dashboard: React.FC = () => {
                       </span>
                       <div className="mt-2 space-y-1">
                         {events.matches.length > 0 && (
-                          <span className="block rounded bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800">
+                          <span className="block rounded bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
                             {events.matches.length} partido
                           </span>
                         )}
                         {events.reservations.length > 0 && (
-                          <span className="block rounded bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-800">
+                          <span className="block rounded bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-800">
                             {events.reservations.length} reserva
                           </span>
                         )}
@@ -237,226 +358,459 @@ const Dashboard: React.FC = () => {
             </Card>
 
             <Card>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Detalle del Dia
+              <h2 className="mb-4 text-xl font-bold text-gray-900">
+                Detalle del día
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {selectedDayMatches.length === 0 &&
                   selectedDayReservations.length === 0 && (
-                    <p className="text-sm text-gray-500 py-8 text-center">
-                      No tienes partidos ni reservas para este dia.
+                    <p className="py-8 text-center text-sm text-gray-500">
+                      No tienes partidos ni reservas para este día.
                     </p>
                   )}
                 {selectedDayMatches.map((partido) => (
-                  <div key={`match-${partido.id}`} className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-sm font-semibold text-amber-800">Partido</p>
-                    <p className="font-bold text-gray-900 mt-1">
-                      {partido.equipo_local?.nombre ?? "-"} vs{" "}
-                      {partido.equipo_visitante?.nombre ?? "-"}
-                    </p>
-                    <p className="text-sm text-gray-700 mt-2 flex items-center gap-2">
-                      <Clock size={16} />
-                      {partido.hora || "Sin hora"}
-                    </p>
-                    <p className="text-sm text-gray-700 mt-1 flex items-center gap-2">
-                      <MapPin size={16} />
-                      {partido.cancha?.nombre || "Sin cancha"}
-                    </p>
-                  </div>
+                  <EventRow
+                    key={`match-${partido.id}`}
+                    tone="amber"
+                    title={`${partido.equipo_local?.nombre ?? "-"} vs ${
+                      partido.equipo_visitante?.nombre ?? "-"
+                    }`}
+                    subtitle={`${partido.hora || "Sin hora"} · ${
+                      partido.cancha?.nombre || "Sin cancha"
+                    }`}
+                  />
                 ))}
                 {selectedDayReservations.map((reserva) => (
-                  <div key={`reservation-${reserva.id}`} className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                    <p className="text-sm font-semibold text-emerald-800">
-                      Cancha Reservada
-                    </p>
-                    <p className="font-bold text-gray-900 mt-1">
-                      {reserva.cancha?.nombre ?? "Cancha"}
-                    </p>
-                    <p className="text-sm text-gray-700 mt-2 flex items-center gap-2">
-                      <Clock size={16} />
-                      {reserva.hora_inicio} - {reserva.hora_fin}
-                    </p>
-                    <p className="text-sm text-gray-700 mt-1 flex items-center gap-2">
-                      <MapPin size={16} />
-                      {reserva.cancha?.ubicacion || "Sin ubicacion"}
-                    </p>
-                  </div>
+                  <EventRow
+                    key={`reservation-${reserva.id}`}
+                    tone="emerald"
+                    title={reserva.cancha?.nombre ?? "Cancha reservada"}
+                    subtitle={`${reserva.hora_inicio} - ${reserva.hora_fin}`}
+                  />
                 ))}
               </div>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Proximos Partidos
-              </h2>
-              <Table
-                columns={[
-                  {
-                    key: "equipo_local",
-                    title: "Local",
-                    render: (value: Equipo) => value?.nombre ?? "-",
-                  },
-                  {
-                    key: "equipo_visitante",
-                    title: "Visitante",
-                    render: (value: Equipo) => value?.nombre ?? "-",
-                  },
-                  { key: "fecha", title: "Fecha" },
-                  { key: "hora", title: "Hora" },
-                  {
-                    key: "cancha",
-                    title: "Cancha",
-                    render: (value: any) => value?.nombre || "Sin cancha",
-                  },
-                ]}
-                data={nextMatches}
-                isLoading={isPlayerLoading}
-              />
-            </Card>
-
-            <Card>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">
-                Reservas de mi Equipo
-              </h2>
-              <Table
-                columns={[
-                  {
-                    key: "cancha",
-                    title: "Cancha",
-                    render: (value: any) => value?.nombre ?? "-",
-                  },
-                  { key: "fecha", title: "Fecha" },
-                  { key: "hora_inicio", title: "Inicio" },
-                  { key: "hora_fin", title: "Fin" },
-                  { key: "estado", title: "Estado" },
-                ]}
-                data={nextReservations}
-                isLoading={isPlayerLoading}
-              />
-            </Card>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <UpcomingMatchesTable
+              title="Próximos partidos"
+              data={nextPlayerMatches}
+              isLoading={isPlayerLoading}
+            />
+            <UpcomingReservationsTable
+              title="Reservas de mi equipo"
+              data={nextPlayerReservations}
+              isLoading={isPlayerLoading}
+            />
           </div>
         </div>
       </Layout>
     );
   }
 
-  const stats = [
-    {
-      label: "Equipos Registrados",
-      value: "12",
-      icon: Users,
-      color: "bg-blue-100 text-blue-600",
-    },
-    {
-      label: "Torneos Activos",
-      value: "3",
-      icon: Trophy,
-      color: "bg-yellow-100 text-yellow-600",
-    },
-    {
-      label: "Reservas Este Mes",
-      value: "24",
-      icon: Calendar,
-      color: "bg-green-100 text-green-600",
-    },
-    {
-      label: "Partidos Jugados",
-      value: "45",
-      icon: BarChart3,
-      color: "bg-purple-100 text-purple-600",
-    },
-  ];
-
   return (
     <Layout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-4xl font-bold text-gray-900">
-            Bienvenido, {usuario?.nombre}
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Panel de administración de eventos deportivos
-          </p>
+        <Hero
+          eyebrow="Panel principal"
+          title={`Bienvenido, ${usuario?.nombre ?? "usuario"}`}
+          description="Datos reales de equipos, torneos, fixture, resultados y reservas cargados desde el backend."
+          aside={
+            <div className="space-y-3">
+              <MiniMetric
+                label="Canchas disponibles"
+                value={`${adminMetrics.canchasDisponibles.length}/${canchas.length}`}
+              />
+              <MiniMetric label="Partidos programados" value={proximosPartidos.length} />
+              <MiniMetric label="Reservas próximas" value={proximasReservas.length} />
+            </div>
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Equipos registrados"
+            value={equipos.length}
+            icon={Users}
+            color="bg-sky-50 text-sky-700 border-sky-100"
+            isLoading={isDashboardLoading}
+          />
+          <StatCard
+            label="Torneos activos"
+            value={adminMetrics.torneosActivos.length}
+            icon={Trophy}
+            color="bg-amber-50 text-amber-700 border-amber-100"
+            isLoading={isDashboardLoading}
+          />
+          <StatCard
+            label="Reservas este mes"
+            value={adminMetrics.reservasEsteMes.length}
+            icon={Calendar}
+            color="bg-emerald-50 text-emerald-700 border-emerald-100"
+            isLoading={isDashboardLoading}
+          />
+          <StatCard
+            label="Partidos finalizados"
+            value={adminMetrics.partidosFinalizados.length}
+            icon={BarChart3}
+            color="bg-indigo-50 text-indigo-700 border-indigo-100"
+            isLoading={isDashboardLoading}
+          />
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.label} hoverable>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm font-medium">
-                      {stat.label}
-                    </p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">
-                      {stat.value}
-                    </p>
-                  </div>
-                  <div className={`p-3 rounded-lg ${stat.color}`}>
-                    <Icon size={24} />
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[0.8fr_1.2fr]">
+          <Card>
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Estado operativo
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Resumen actual de canchas y competencias.
+                </p>
+              </div>
+              <CheckCircle2 className="text-emerald-600" size={24} />
+            </div>
+            <div className="space-y-3">
+              <ProgressRow
+                label="Canchas disponibles"
+                value={adminMetrics.canchasDisponibles.length}
+                total={Math.max(canchas.length, 1)}
+                tone="emerald"
+              />
+              <ProgressRow
+                label="Partidos finalizados"
+                value={adminMetrics.partidosFinalizados.length}
+                total={Math.max(partidos.length, 1)}
+                tone="indigo"
+              />
+              <ProgressRow
+                label="Reservas confirmadas"
+                value={reservas.filter((r) => r.estado === "confirmada").length}
+                total={Math.max(reservas.length, 1)}
+                tone="sky"
+              />
+            </div>
+          </Card>
+
+          <Card>
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Actividad real del sistema
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Próximos eventos detectados en fixture y reservas.
+                </p>
+              </div>
+              <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-bold text-primary-700">
+                {formatDate(todayKey)}
+              </span>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <EventSummary
+                icon={Trophy}
+                title="Próximo partido"
+                value={
+                  proximosPartidos[0]
+                    ? `${proximosPartidos[0].equipo_local?.nombre ?? "-"} vs ${
+                        proximosPartidos[0].equipo_visitante?.nombre ?? "-"
+                      }`
+                    : "Sin partidos próximos"
+                }
+                detail={
+                  proximosPartidos[0]
+                    ? `${formatDate(proximosPartidos[0].fecha)} · ${
+                        proximosPartidos[0].hora || "Sin hora"
+                      }`
+                    : "Crea partidos desde Fixture"
+                }
+                tone="amber"
+              />
+              <EventSummary
+                icon={MapPin}
+                title="Próxima reserva"
+                value={
+                  proximasReservas[0]?.cancha?.nombre ?? "Sin reservas próximas"
+                }
+                detail={
+                  proximasReservas[0]
+                    ? `${formatDate(proximasReservas[0].fecha)} · ${
+                        proximasReservas[0].hora_inicio
+                      } - ${proximasReservas[0].hora_fin}`
+                    : "Agenda reservas desde Canchas"
+                }
+                tone="emerald"
+              />
+            </div>
+          </Card>
         </div>
 
-        {/* Recent Activity */}
-        <Card>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">
-            Actividad Reciente
-          </h2>
-          <div className="space-y-4">
-            <div className="flex items-start gap-4 pb-4 border-b border-gray-200">
-              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <Users size={20} className="text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
-                  Nuevo equipo registrado
-                </p>
-                <p className="text-sm text-gray-600">
-                  Hace 2 horas - Academia Central
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4 pb-4 border-b border-gray-200">
-              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                <Trophy size={20} className="text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
-                  Torneo Intercarreras iniciado
-                </p>
-                <p className="text-sm text-gray-600">
-                  Hace 5 horas - Participan 8 equipos
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center">
-                <Calendar size={20} className="text-yellow-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-900">
-                  Reserva de cancha confirmada
-                </p>
-                <p className="text-sm text-gray-600">
-                  Hace 1 día - Cancha Principal, Mañana 15:00
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <UpcomingMatchesTable
+            title="Próximos partidos"
+            data={proximosPartidos}
+            isLoading={isDashboardLoading}
+          />
+          <UpcomingReservationsTable
+            title="Próximas reservas"
+            data={proximasReservas}
+            isLoading={isDashboardLoading}
+          />
+        </div>
       </div>
     </Layout>
   );
 };
+
+interface HeroProps {
+  eyebrow: string;
+  title: string;
+  description: string;
+  aside: React.ReactNode;
+}
+
+const Hero: React.FC<HeroProps> = ({ eyebrow, title, description, aside }) => (
+  <div className="overflow-hidden rounded-lg border border-primary-100 bg-white shadow-sm">
+    <div className="grid gap-6 p-6 lg:grid-cols-[1fr_320px] lg:items-center">
+      <div>
+        <p className="text-sm font-bold uppercase tracking-wide text-primary-700">
+          {eyebrow}
+        </p>
+        <h1 className="mt-2 text-4xl font-bold text-gray-950">{title}</h1>
+        <p className="mt-3 max-w-2xl text-gray-600">{description}</p>
+      </div>
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+        {aside}
+      </div>
+    </div>
+  </div>
+);
+
+interface MiniMetricProps {
+  label: string;
+  value: React.ReactNode;
+}
+
+const MiniMetric: React.FC<MiniMetricProps> = ({ label, value }) => (
+  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
+    <span className="text-sm font-semibold text-gray-600">{label}</span>
+    <span className="text-lg font-bold text-gray-950">{value}</span>
+  </div>
+);
+
+interface StatCardProps {
+  label: string;
+  value: React.ReactNode;
+  icon: React.ElementType;
+  color: string;
+  isLoading?: boolean;
+}
+
+const StatCard: React.FC<StatCardProps> = ({
+  label,
+  value,
+  icon: Icon,
+  color,
+  isLoading,
+}) => (
+  <Card hoverable>
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-sm font-semibold text-gray-600">{label}</p>
+        <p className="mt-2 text-3xl font-bold text-gray-900">
+          {isLoading ? "..." : value}
+        </p>
+      </div>
+      <div className={`rounded-lg border p-3 ${color}`}>
+        <Icon size={24} />
+      </div>
+    </div>
+  </Card>
+);
+
+interface ProgressRowProps {
+  label: string;
+  value: number;
+  total: number;
+  tone: "emerald" | "indigo" | "sky";
+}
+
+const ProgressRow: React.FC<ProgressRowProps> = ({
+  label,
+  value,
+  total,
+  tone,
+}) => {
+  const percent = Math.min(100, Math.round((value / total) * 100));
+  const colors = {
+    emerald: "bg-emerald-500",
+    indigo: "bg-indigo-500",
+    sky: "bg-sky-500",
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-semibold text-gray-700">{label}</span>
+        <span className="font-bold text-gray-900">
+          {value}/{total}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-gray-100">
+        <div
+          className={`h-2 rounded-full ${colors[tone]}`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+interface EventSummaryProps {
+  icon: React.ElementType;
+  title: string;
+  value: string;
+  detail: string;
+  tone: "amber" | "emerald";
+}
+
+const EventSummary: React.FC<EventSummaryProps> = ({
+  icon: Icon,
+  title,
+  value,
+  detail,
+  tone,
+}) => {
+  const styles = {
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+  };
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+      <div
+        className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg border ${styles[tone]}`}
+      >
+        <Icon size={20} />
+      </div>
+      <p className="text-sm font-bold uppercase tracking-wide text-gray-500">
+        {title}
+      </p>
+      <p className="mt-1 font-bold text-gray-900">{value}</p>
+      <p className="mt-1 text-sm text-gray-600">{detail}</p>
+    </div>
+  );
+};
+
+interface EventRowProps {
+  title: string;
+  subtitle: string;
+  tone: "amber" | "emerald";
+}
+
+const EventRow: React.FC<EventRowProps> = ({ title, subtitle, tone }) => {
+  const styles = {
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  };
+
+  return (
+    <div className={`rounded-lg border p-4 ${styles[tone]}`}>
+      <p className="font-bold text-gray-900">{title}</p>
+      <p className="mt-2 flex items-center gap-2 text-sm text-gray-700">
+        <Clock size={16} />
+        {subtitle}
+      </p>
+    </div>
+  );
+};
+
+interface UpcomingMatchesTableProps {
+  title: string;
+  data: Partido[];
+  isLoading: boolean;
+}
+
+const UpcomingMatchesTable: React.FC<UpcomingMatchesTableProps> = ({
+  title,
+  data,
+  isLoading,
+}) => (
+  <Card>
+    <h2 className="mb-4 text-xl font-bold text-gray-900">{title}</h2>
+    <Table
+      columns={[
+        {
+          key: "equipo_local",
+          title: "Local",
+          render: (value: Equipo) => value?.nombre ?? "-",
+        },
+        {
+          key: "equipo_visitante",
+          title: "Visitante",
+          render: (value: Equipo) => value?.nombre ?? "-",
+        },
+        {
+          key: "fecha",
+          title: "Fecha",
+          render: (value: string) => formatDate(value),
+        },
+        { key: "hora", title: "Hora" },
+        {
+          key: "cancha",
+          title: "Cancha",
+          render: (value: any) => value?.nombre || "Sin cancha",
+        },
+      ]}
+      data={data}
+      isLoading={isLoading}
+    />
+  </Card>
+);
+
+interface UpcomingReservationsTableProps {
+  title: string;
+  data: Reserva[];
+  isLoading: boolean;
+}
+
+const UpcomingReservationsTable: React.FC<UpcomingReservationsTableProps> = ({
+  title,
+  data,
+  isLoading,
+}) => (
+  <Card>
+    <h2 className="mb-4 text-xl font-bold text-gray-900">{title}</h2>
+    <Table
+      columns={[
+        {
+          key: "cancha",
+          title: "Cancha",
+          render: (value: any) => value?.nombre ?? "-",
+        },
+        {
+          key: "fecha",
+          title: "Fecha",
+          render: (value: string) => formatDate(value),
+        },
+        { key: "hora_inicio", title: "Inicio" },
+        { key: "hora_fin", title: "Fin" },
+        {
+          key: "estado",
+          title: "Estado",
+          render: (value: string) => (
+            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold capitalize text-gray-700">
+              {value}
+            </span>
+          ),
+        },
+      ]}
+      data={data}
+      isLoading={isLoading}
+    />
+  </Card>
+);
 
 export default Dashboard;

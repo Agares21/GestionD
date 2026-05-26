@@ -34,7 +34,7 @@ const ProfilePage: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Mi Perfil</h1>
             <p className="text-gray-600 mt-2">
-              Informacion de tu cuenta y permisos dentro del sistema.
+              Información de tu cuenta y permisos dentro del sistema.
             </p>
           </div>
           <Button variant="secondary" onClick={() => navigate("/dashboard")}>
@@ -133,15 +133,15 @@ const ProfilePage: React.FC = () => {
             <Card>
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">Sesion</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Sesión</h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Puedes cerrar sesion desde aqui cuando termines de usar el
+                    Puedes cerrar sesión desde aquí cuando termines de usar el
                     sistema.
                   </p>
                 </div>
                 <Button variant="danger" onClick={handleLogout}>
                   <LogOut size={18} />
-                  Cerrar sesion
+                  Cerrar sesión
                 </Button>
               </div>
             </Card>

@@ -14,8 +14,8 @@ const Card: React.FC<CardProps> = ({
   return (
     <div
       className={`
-        bg-white rounded-lg shadow-md p-6 transition-shadow
-        ${hoverable ? "hover:shadow-lg" : ""}
+        rounded-lg border border-gray-200/80 bg-white/95 p-6 shadow-sm ring-1 ring-white/60 transition-all
+        ${hoverable ? "hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-lg" : ""}
         ${className}
       `}
     >

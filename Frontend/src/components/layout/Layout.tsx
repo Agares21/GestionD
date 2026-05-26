@@ -10,7 +10,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef6ff_44%,#f8fafc_100%)] flex flex-col">
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />

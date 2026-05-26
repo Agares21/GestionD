@@ -85,3 +85,57 @@ img {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.reservation-calendar {
+  width: 100%;
+  border: 0;
+  font-family: inherit;
+}
+
+.reservation-calendar .react-calendar__navigation {
+  height: 44px;
+  margin-bottom: 12px;
+}
+
+.reservation-calendar .react-calendar__navigation button {
+  border-radius: 8px;
+  color: #111827;
+  font-weight: 700;
+}
+
+.reservation-calendar .react-calendar__navigation button:enabled:hover,
+.reservation-calendar .react-calendar__navigation button:enabled:focus {
+  background: #eef2ff;
+}
+
+.reservation-calendar .react-calendar__month-view__weekdays {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.reservation-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none;
+}
+
+.reservation-calendar .react-calendar__tile {
+  min-height: 72px;
+  border-radius: 8px;
+  color: #374151;
+}
+
+.reservation-calendar .react-calendar__tile:enabled:hover,
+.reservation-calendar .react-calendar__tile:enabled:focus {
+  background: #eef2ff;
+}
+
+.reservation-calendar .react-calendar__tile--now {
+  background: #fef3c7;
+}
+
+.reservation-calendar .react-calendar__tile--active,
+.reservation-calendar__selected {
+  background: #2563eb !important;
+  color: #ffffff !important;
+}

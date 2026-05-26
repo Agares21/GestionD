@@ -3,14 +3,13 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "@store/authStore";
 import { UserRole } from "@types";
 import {
-  Home,
-  Users,
-  Trophy,
+  BarChart3,
   Briefcase,
   Calendar,
-  Settings,
-  BarChart3,
-  BookOpen,
+  CalendarDays,
+  Home,
+  Trophy,
+  Users,
   X,
 } from "lucide-react";
 
@@ -60,6 +59,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       roles: [UserRole.ADMIN, UserRole.DELEGADO],
     },
     {
+      icon: CalendarDays,
+      label: "Fixture",
+      href: "/fixture",
+      roles: [UserRole.ADMIN, UserRole.DELEGADO],
+    },
+    {
       icon: BarChart3,
       label: "Resultados",
       href: "/resultados",
@@ -71,33 +76,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       href: "/disciplinas",
       roles: [UserRole.ADMIN],
     },
-    {
-      icon: BookOpen,
-      label: "CMS",
-      href: "/cms",
-      roles: [UserRole.ADMIN],
-    },
-    {
-      icon: BarChart3,
-      label: "Panel Administrativo",
-      href: "/admin",
-      roles: [UserRole.ADMIN],
-    },
-    {
-      icon: Settings,
-      label: "Configuración",
-      href: "/settings",
-      roles: [UserRole.ADMIN],
-    },
   ];
 
   const filteredMenuItems = menuItems.filter((item) => hasRole(item.roles));
-
   const isActive = (href: string) => location.pathname === href;
 
   return (
     <>
-      {/* Mobile Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
@@ -105,21 +90,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`
-          fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 bg-gray-900 text-white transform transition-transform
+          fixed left-0 top-16 h-[calc(100vh-4rem)] w-72 transform border-r border-gray-200 bg-white/95 text-gray-900 shadow-xl transition-transform backdrop-blur
           z-40 lg:relative lg:top-0 lg:h-screen lg:transform-none
           ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
         <div className="p-4 lg:hidden flex justify-end">
-          <button onClick={onClose}>
+          <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100">
             <X size={24} />
           </button>
         </div>
 
-        <nav className="p-4 space-y-2">
+        <div className="mx-4 mt-4 rounded-lg border border-primary-100 bg-primary-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wide text-primary-700">
+            Gestión deportiva
+          </p>
+          <p className="mt-1 text-sm text-primary-900">
+            Torneos, reservas y equipos en un solo lugar.
+          </p>
+        </div>
+
+        <nav className="p-4 space-y-1">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
@@ -130,11 +123,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 to={item.href}
                 onClick={onClose}
                 className={`
-                  flex items-center gap-3 px-4 py-2 rounded-lg transition-colors
+                  flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all
                   ${
                     active
-                      ? "bg-primary-600 text-white"
-                      : "text-gray-300 hover:bg-gray-800"
+                      ? "bg-primary-600 text-white shadow-sm"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-950"
                   }
                 `}
               >

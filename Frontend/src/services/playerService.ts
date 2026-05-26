@@ -1,5 +1,31 @@
 import { apiClient } from "./api";
-import { Equipo, Jugador, Persona, PaginatedResponse } from "@types";
+import { Equipo, Jugador, Persona, PaginatedResponse, UserRole } from "@types";
+import { normalizeText } from "@utils/text";
+
+const normalizeRole = (role: string): UserRole | string => {
+  const roles: Record<string, UserRole> = {
+    Administrador: UserRole.ADMIN,
+    Admin: UserRole.ADMIN,
+    ADMIN: UserRole.ADMIN,
+    Delegado: UserRole.DELEGADO,
+    DELEGADO: UserRole.DELEGADO,
+    Jugador: UserRole.JUGADOR,
+    JUGADOR: UserRole.JUGADOR,
+  };
+
+  return roles[role] || role.toUpperCase();
+};
+
+const toPersona = (persona: any): Persona => ({
+  ...persona,
+  cedula: persona.cedula ?? persona.carnet ?? "",
+  telefono: persona.telefono ?? persona.celular ?? "",
+  roles: (persona.roles || [])
+    .map((personaRol: any) =>
+      normalizeRole(personaRol.rol?.nombre ?? personaRol.nombre ?? personaRol),
+    )
+    .filter(Boolean),
+});
 
 const toJugador = (item: any): Jugador => {
   const persona = item.persona ?? item.jugador ?? item;
@@ -7,7 +33,7 @@ const toJugador = (item: any): Jugador => {
   return {
     ...item,
     id: item.id ?? persona.id,
-    persona,
+    persona: toPersona(persona),
     numero_camiseta: item.numero_camiseta ?? 0,
     posicion: item.posicion ?? "",
     estado: item.estado ?? "activo",
@@ -74,8 +100,10 @@ export const jugadorService = {
 
     return (response.data || []).map((relacion) => ({
       ...relacion.equipo,
-      nombre: relacion.equipo?.nombre ?? relacion.equipo?.nombre_equipo,
-      categoria: relacion.equipo?.disciplina?.nombre ?? "General",
+      nombre: normalizeText(
+        relacion.equipo?.nombre ?? relacion.equipo?.nombre_equipo,
+      ),
+      categoria: normalizeText(relacion.equipo?.disciplina?.nombre ?? "General"),
       cantidad_jugadores: relacion.equipo?.jugadores?.length ?? 0,
       estado: relacion.equipo?.estado ?? "registrado",
     }) as Equipo);
@@ -114,28 +142,60 @@ export const jugadorService = {
 
 export const personaService = {
   async obtenerPersonas(params?: any): Promise<PaginatedResponse<Persona>> {
-    return apiClient.getPaginated<Persona>("/persona", params);
+    const response = await apiClient.getPaginated<any>("/persona", params);
+    return {
+      ...response,
+      data: response.data.map(toPersona),
+    };
   },
 
   async obtenerPersona(id: number): Promise<Persona> {
-    const response = await apiClient.get<Persona>(`/persona/${id}`);
-    return response.data!;
+    const response = await apiClient.get<any>(`/persona/${id}`);
+    return toPersona(response.data);
   },
 
   async crearPersona(data: Partial<Persona>): Promise<Persona> {
-    const response = await apiClient.post<Persona>("/persona", data);
-    return response.data!;
+    const response = await apiClient.post<any>("/persona", data);
+    return toPersona(response.data);
   },
 
   async actualizarPersona(
     id: number,
     data: Partial<Persona>,
   ): Promise<Persona> {
-    const response = await apiClient.patch<Persona>(`/persona/${id}`, data);
-    return response.data!;
+    const response = await apiClient.patch<any>(`/persona/${id}`, data);
+    return toPersona(response.data);
   },
 
   async eliminarPersona(id: number): Promise<void> {
     await apiClient.delete(`/persona/${id}`);
+  },
+
+  async asignarRolJugador(personaId: number): Promise<void> {
+    const rolesPersona = await apiClient.get<any[]>(
+      `/persona-rol/persona/${personaId}`,
+    );
+    const yaEsJugador = (rolesPersona.data || []).some(
+      (personaRol) =>
+        normalizeRole(personaRol.rol?.nombre ?? "") === UserRole.JUGADOR,
+    );
+
+    if (yaEsJugador) {
+      return;
+    }
+
+    const roles = await apiClient.getPaginated<any>("/rol");
+    const rolJugador = roles.data.find(
+      (rol) => normalizeRole(rol.nombre) === UserRole.JUGADOR,
+    );
+
+    if (!rolJugador) {
+      return;
+    }
+
+    await apiClient.post("/persona-rol", {
+      persona_id: personaId,
+      rol_id: rolJugador.id,
+    });
   },
 };

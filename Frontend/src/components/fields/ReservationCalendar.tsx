@@ -1,20 +1,55 @@
-import React, { useEffect, useState } from "react";
-import { Calendar, MapPin, Clock, Edit2, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import CalendarWidget from "react-calendar";
+import "react-calendar/dist/Calendar.css";
+import {
+  Calendar,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Edit2,
+  MapPin,
+  Plus,
+  Trash2,
+  XCircle,
+} from "lucide-react";
+import { Reserva } from "@types";
 import { useReservationStore } from "@store/reservationStore";
 import { Button, Card, Modal, Input, Select } from "@components/common";
 import { canchaService } from "@services/fieldService";
 import { equipoService } from "@services/equipoService";
 
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatLongDate = (date: Date) =>
+  date.toLocaleDateString("es-ES", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+const statusStyles = {
+  confirmada: "bg-emerald-50 border-emerald-200 text-emerald-800",
+  pendiente: "bg-amber-50 border-amber-200 text-amber-800",
+  cancelada: "bg-red-50 border-red-200 text-red-800",
+};
+
 const ReservationCalendar: React.FC = () => {
   const {
     reservas,
+    isLoading,
     obtenerReservas,
     crearReserva,
     actualizarReserva,
     cancelarReserva,
     eliminarReserva,
-  } =
-    useReservationStore();
+  } = useReservationStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -29,10 +64,10 @@ const ReservationCalendar: React.FC = () => {
   });
 
   useEffect(() => {
-    obtenerReservas({ fecha: selectedDate.toISOString().split("T")[0] });
+    obtenerReservas();
     cargarCanchas();
     cargarEquipos();
-  }, [selectedDate, obtenerReservas]);
+  }, [obtenerReservas]);
 
   const cargarCanchas = async () => {
     try {
@@ -51,6 +86,25 @@ const ReservationCalendar: React.FC = () => {
       console.error("Error al cargar equipos:", error);
     }
   };
+
+  const reservationsByDate = useMemo(
+    () =>
+      reservas.reduce<Record<string, Reserva[]>>((acc, reserva) => {
+        acc[reserva.fecha] = [...(acc[reserva.fecha] || []), reserva];
+        return acc;
+      }, {}),
+    [reservas],
+  );
+
+  const selectedDateKey = formatDateKey(selectedDate);
+  const dayReservations = (reservationsByDate[selectedDateKey] || []).sort(
+    (a, b) => a.hora_inicio.localeCompare(b.hora_inicio),
+  );
+  const confirmedCount = reservas.filter((r) => r.estado === "confirmada").length;
+  const pendingCount = reservas.filter((r) => r.estado === "pendiente").length;
+  const activeCourts = new Set(
+    reservas.filter((r) => r.estado !== "cancelada").map((r) => r.cancha?.id),
+  ).size;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +128,7 @@ const ReservationCalendar: React.FC = () => {
         hora_inicio: "",
         hora_fin: "",
       });
-      obtenerReservas({ fecha: selectedDate.toISOString().split("T")[0] });
+      obtenerReservas();
     } catch (error) {
       console.error("Error:", error);
     }
@@ -85,14 +139,14 @@ const ReservationCalendar: React.FC = () => {
     setFormData({
       cancha_id: "",
       equipo_id: "",
-      fecha: selectedDate.toISOString().split("T")[0],
+      fecha: selectedDateKey,
       hora_inicio: "",
       hora_fin: "",
     });
     setIsModalOpen(true);
   };
 
-  const openEdit = (reserva: any) => {
+  const openEdit = (reserva: Reserva) => {
     setEditingId(reserva.id);
     setFormData({
       cancha_id: String(reserva.cancha_id ?? reserva.cancha?.id ?? ""),
@@ -104,114 +158,142 @@ const ReservationCalendar: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDateChange = (days: number) => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + days);
-    setSelectedDate(newDate);
+  const handleCalendarChange = (value: any) => {
+    if (value instanceof Date) {
+      setSelectedDate(value);
+    }
   };
-
-  const dayReservations = reservas.filter(
-    (r) => r.fecha === selectedDate.toISOString().split("T")[0],
-  );
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Reserva de Canchas</h1>
-        <Button
-          variant="primary"
-          onClick={openCreate}
-          className="gap-2"
-        >
-          <Calendar size={20} />
-          Nueva Reserva
-        </Button>
+      <div className="overflow-hidden rounded-lg bg-gray-900 text-white shadow-sm">
+        <div className="grid gap-6 p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-primary-200">
+              Gestión de espacios deportivos
+            </p>
+            <h1 className="mt-2 text-3xl font-bold">Reserva de Canchas</h1>
+            <p className="mt-2 max-w-2xl text-gray-300">
+              Consulta disponibilidad por fecha, organiza horarios y administra
+              solicitudes de reserva desde un calendario mensual.
+            </p>
+          </div>
+          <Button variant="primary" onClick={openCreate} className="gap-2">
+            <Plus size={20} />
+            Nueva Reserva
+          </Button>
+        </div>
       </div>
 
-      {/* Calendar Navigation */}
-      <Card>
-        <div className="flex items-center justify-between mb-6">
-          <Button variant="secondary" onClick={() => handleDateChange(-1)}>
-            ← Anterior
-          </Button>
-          <h2 className="text-2xl font-bold">
-            {selectedDate.toLocaleDateString("es-ES", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </h2>
-          <Button variant="secondary" onClick={() => handleDateChange(1)}>
-            Siguiente →
-          </Button>
-        </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          label="Confirmadas"
+          value={confirmedCount}
+          icon={<CheckCircle2 size={20} />}
+          className="border-emerald-200 bg-emerald-50 text-emerald-900"
+        />
+        <MetricCard
+          label="Pendientes"
+          value={pendingCount}
+          icon={<Clock size={20} />}
+          className="border-amber-200 bg-amber-50 text-amber-900"
+        />
+        <MetricCard
+          label="Canchas activas"
+          value={activeCourts}
+          icon={<MapPin size={20} />}
+          className="border-sky-200 bg-sky-50 text-sky-900"
+        />
+      </div>
 
-        {/* Reservations for Selected Day */}
-        <div className="space-y-4">
-          {dayReservations.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              No hay reservas para este día
-            </p>
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <Card className="overflow-hidden">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Calendario</h2>
+              <p className="text-sm text-gray-500">
+                Selecciona un día para ver sus reservas.
+              </p>
+            </div>
+            <Calendar className="text-primary-600" size={24} />
+          </div>
+
+          <CalendarWidget
+            onChange={handleCalendarChange}
+            value={selectedDate}
+            locale="es-ES"
+            prevLabel={<ChevronLeft size={18} />}
+            nextLabel={<ChevronRight size={18} />}
+            prev2Label={null}
+            next2Label={null}
+            tileContent={({ date, view }) => {
+              if (view !== "month") return null;
+              const count = reservationsByDate[formatDateKey(date)]?.length || 0;
+              if (!count) return null;
+              return (
+                <span className="mx-auto mt-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1 text-[10px] font-bold text-white">
+                  {count}
+                </span>
+              );
+            }}
+            tileClassName={({ date, view }) =>
+              view === "month" && formatDateKey(date) === selectedDateKey
+                ? "reservation-calendar__selected"
+                : undefined
+            }
+            className="reservation-calendar"
+          />
+        </Card>
+
+        <Card>
+          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-bold capitalize text-gray-900">
+                {formatLongDate(selectedDate)}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {dayReservations.length} reserva
+                {dayReservations.length === 1 ? "" : "s"} programada
+                {dayReservations.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            <Button variant="secondary" onClick={openCreate} className="gap-2">
+              <Plus size={18} />
+              Agendar
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-300 border-t-primary-600" />
+            </div>
+          ) : dayReservations.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-12 text-center">
+              <Calendar className="mx-auto text-gray-400" size={36} />
+              <p className="mt-3 font-semibold text-gray-700">
+                No hay reservas para este día
+              </p>
+              <p className="text-sm text-gray-500">
+                Puedes crear una reserva usando el botón Agendar.
+              </p>
+            </div>
           ) : (
-            dayReservations.map((reserva) => (
-              <div
-                key={reserva.id}
-                className={`p-4 border rounded-lg ${
-                  reserva.estado === "confirmada"
-                    ? "bg-green-50 border-green-200"
-                    : "bg-yellow-50 border-yellow-200"
-                }`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-bold text-lg">
-                      {reserva.cancha.nombre}
-                    </h3>
-                    <div className="flex gap-6 mt-2 text-sm text-gray-600">
-                      <div className="flex items-center gap-2">
-                        <MapPin size={16} />
-                        {reserva.cancha.ubicacion}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock size={16} />
-                        {reserva.hora_inicio} - {reserva.hora_fin}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => openEdit(reserva)}
-                    >
-                      <Edit2 size={16} />
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => eliminarReserva(reserva.id)}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                  {reserva.estado === "pendiente" && (
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() =>
-                        cancelarReserva(reserva.id, "Cancelado por usuario")
-                      }
-                    >
-                      Cancelar
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))
+            <div className="space-y-3">
+              {dayReservations.map((reserva) => (
+                <ReservationItem
+                  key={reserva.id}
+                  reserva={reserva}
+                  onEdit={() => openEdit(reserva)}
+                  onDelete={() => eliminarReserva(reserva.id)}
+                  onCancel={() =>
+                    cancelarReserva(reserva.id, "Cancelado por usuario")
+                  }
+                />
+              ))}
+            </div>
           )}
-        </div>
-      </Card>
+        </Card>
+      </div>
 
       <ReservationModal
         isOpen={isModalOpen}
@@ -229,6 +311,92 @@ const ReservationCalendar: React.FC = () => {
     </div>
   );
 };
+
+interface MetricCardProps {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  className: string;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({
+  label,
+  value,
+  icon,
+  className,
+}) => (
+  <div className={`rounded-lg border p-4 ${className}`}>
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-semibold uppercase">{label}</span>
+      {icon}
+    </div>
+    <p className="mt-3 text-3xl font-bold">{value}</p>
+  </div>
+);
+
+interface ReservationItemProps {
+  reserva: Reserva;
+  onEdit: () => void;
+  onDelete: () => void;
+  onCancel: () => void;
+}
+
+const ReservationItem: React.FC<ReservationItemProps> = ({
+  reserva,
+  onEdit,
+  onDelete,
+  onCancel,
+}) => (
+  <div
+    className={`rounded-lg border p-4 ${
+      statusStyles[reserva.estado] || "border-gray-200 bg-white text-gray-800"
+    }`}
+  >
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-bold text-gray-900">
+            {reserva.cancha?.nombre || "Cancha sin nombre"}
+          </h3>
+          <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-bold capitalize">
+            {reserva.estado}
+          </span>
+        </div>
+        <div className="mt-3 grid gap-2 text-sm text-gray-700 md:grid-cols-3">
+          <span className="flex items-center gap-2">
+            <Clock size={16} />
+            {reserva.hora_inicio} - {reserva.hora_fin}
+          </span>
+          <span className="flex items-center gap-2">
+            <MapPin size={16} />
+            {reserva.cancha?.ubicacion || "Sin ubicación"}
+          </span>
+          <span className="flex items-center gap-2">
+            {reserva.estado === "cancelada" ? (
+              <XCircle size={16} />
+            ) : (
+              <CheckCircle2 size={16} />
+            )}
+            {reserva.equipo?.nombre || "Sin equipo asignado"}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" size="sm" onClick={onEdit}>
+          <Edit2 size={16} />
+        </Button>
+        {reserva.estado === "pendiente" && (
+          <Button variant="danger" size="sm" onClick={onCancel}>
+            Cancelar
+          </Button>
+        )}
+        <Button variant="danger" size="sm" onClick={onDelete}>
+          <Trash2 size={16} />
+        </Button>
+      </div>
+    </div>
+  </div>
+);
 
 interface ReservationModalProps {
   isOpen: boolean;

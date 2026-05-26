@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { CalendarDays, ShieldCheck, Trophy, Users } from "lucide-react";
 import { useAuthStore } from "@store/authStore";
 import { Button, Input, Alert } from "@components/common";
 
@@ -28,70 +29,139 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 to-secondary-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-          ⚽ Gestión Deportiva
-        </h1>
-        <p className="text-gray-600 text-center mb-8">
-          Sistema de Administración de Eventos Deportivos
-        </p>
+    <div className="min-h-screen bg-gray-950 text-white">
+      <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="relative hidden overflow-hidden bg-[linear-gradient(135deg,#0f172a_0%,#075985_54%,#047857_100%)] p-10 lg:flex lg:flex-col lg:justify-between">
+          <div className="absolute inset-x-10 top-28 h-px bg-white/20" />
+          <div className="absolute bottom-16 left-10 right-10 grid grid-cols-6 gap-3 opacity-25">
+            {Array.from({ length: 36 }).map((_, index) => (
+              <div key={index} className="h-16 rounded border border-white/40" />
+            ))}
+          </div>
 
-        {(localError || error) && (
-          <Alert
-            type="error"
-            message={localError || error || ""}
-            onClose={() => setLocalError(null)}
-            closable
-          />
-        )}
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-primary-700 shadow-lg">
+              <Trophy size={28} />
+            </div>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide text-primary-100">
+                Universidad
+              </p>
+              <h1 className="text-2xl font-bold">Gestión Deportiva</h1>
+            </div>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@email.com"
-            fullWidth
-            required
-          />
+          <div className="relative z-10 max-w-xl">
+            <p className="text-sm font-bold uppercase tracking-wide text-emerald-100">
+              Torneos y reservas
+            </p>
+            <h2 className="mt-4 text-5xl font-bold leading-tight">
+              Controla equipos, fixture y canchas con una experiencia clara.
+            </h2>
+            <div className="mt-8 grid grid-cols-3 gap-3">
+              {[
+                { icon: Users, label: "Equipos" },
+                { icon: CalendarDays, label: "Reservas" },
+                { icon: ShieldCheck, label: "Roles" },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.label}
+                    className="rounded-lg border border-white/20 bg-white/10 p-4 backdrop-blur"
+                  >
+                    <Icon size={22} />
+                    <p className="mt-3 text-sm font-semibold">{item.label}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
 
-          <Input
-            label="Contraseña"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            fullWidth
-            required
-          />
+        <section className="flex items-center justify-center bg-slate-50 p-4 text-gray-900 sm:p-8">
+          <div className="w-full max-w-md">
+            <div className="mb-8 flex items-center gap-3 lg:hidden">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 text-white">
+                <Trophy size={24} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Gestión Deportiva</h1>
+                <p className="text-sm text-gray-500">Panel universitario</p>
+              </div>
+            </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            fullWidth
-            size="lg"
-            isLoading={isLoading}
-          >
-            Iniciar Sesión
-          </Button>
-        </form>
+            <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-xl">
+              <div className="mb-8">
+                <p className="text-sm font-bold uppercase tracking-wide text-primary-700">
+                  Acceso al sistema
+                </p>
+                <h2 className="mt-2 text-3xl font-bold text-gray-950">
+                  Iniciar sesión
+                </h2>
+                <p className="mt-2 text-gray-600">
+                  Ingresa con tu cuenta institucional para continuar.
+                </p>
+              </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 mb-4">
-            ¿No tienes cuenta?{" "}
-            <Link
-              to="/register"
-              className="text-primary-600 hover:text-primary-700 font-semibold"
-            >
-              Regístrate aquí
-            </Link>
-          </p>
-          <p className="text-center text-gray-600 text-sm border-t pt-4">
-            Demo: usa credenciales de prueba del backend
-          </p>
-        </div>
+              {(localError || error) && (
+                <Alert
+                  type="error"
+                  message={localError || error || ""}
+                  onClose={() => setLocalError(null)}
+                  closable
+                />
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Input
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  fullWidth
+                  required
+                />
+
+                <Input
+                  label="Contraseña"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="********"
+                  fullWidth
+                  required
+                />
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  fullWidth
+                  size="lg"
+                  isLoading={isLoading}
+                >
+                  Entrar al panel
+                </Button>
+              </form>
+
+              <div className="mt-6 border-t border-gray-200 pt-6 text-center">
+                <p className="text-gray-600">
+                  ¿No tienes cuenta?{" "}
+                  <Link
+                    to="/register"
+                    className="font-semibold text-primary-700 hover:text-primary-800"
+                  >
+                    Regístrate aquí
+                  </Link>
+                </p>
+                <p className="mt-4 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                  Demo: usa credenciales de prueba del backend.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

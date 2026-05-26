@@ -5,6 +5,7 @@ export { default as TeamsPage } from "./TeamsPage";
 export { default as PlayersPage } from "./PlayersPage";
 export { default as ReservationsPage } from "./ReservationsPage";
 export { default as TournamentsPage } from "./TournamentsPage";
+export { default as FixturePage } from "./FixturePage";
 export { default as ResultsPage } from "./ResultsPage";
 export { default as AdminPage } from "./AdminPage";
 export { default as CMSPage } from "./CMSPage";

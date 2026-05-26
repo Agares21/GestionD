@@ -34,14 +34,14 @@ const Table: React.FC<TableProps> = ({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full">
+    <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <table className="w-full bg-white">
         <thead>
-          <tr className="border-b-2 border-gray-200 bg-gray-50">
+          <tr className="border-b border-gray-200 bg-gray-50/90">
             {columns.map((column) => (
               <th
                 key={column.key}
-                className="px-6 py-3 text-left text-sm font-semibold text-gray-900"
+                className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600"
               >
                 {column.title}
               </th>
@@ -52,7 +52,7 @@ const Table: React.FC<TableProps> = ({
           {data.map((record, index) => (
             <tr
               key={index}
-              className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+              className="border-b border-gray-100 last:border-b-0 hover:bg-primary-50/40 cursor-pointer transition-colors"
               onClick={() => onRowClick?.(record)}
             >
               {columns.map((column) => (
