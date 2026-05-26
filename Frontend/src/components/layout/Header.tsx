@@ -1,7 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@store/authStore";
-import { Menu, LogOut, User, Trophy } from "lucide-react";
+import { LogOut, Menu, User } from "lucide-react";
+import logoSrc from "../images/Logo color - azul (1).png";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -34,9 +35,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               <Menu size={24} />
             </button>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-600 text-white shadow-sm">
-                <Trophy size={22} />
-              </div>
+              <img
+                src={logoSrc}
+                alt="Gestión Deportiva"
+                className="h-11 w-11 rounded-lg object-contain"
+              />
               <div>
                 <h1 className="text-xl font-bold text-gray-950">
                   Gestión Deportiva

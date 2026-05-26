@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { CalendarDays, ShieldCheck, Trophy, Users } from "lucide-react";
+import { CalendarDays, ShieldCheck, Users } from "lucide-react";
 import { useAuthStore } from "@store/authStore";
 import { Button, Input, Alert } from "@components/common";
+import logoSrc from "../images/Logo color - azul (1).png";
 
 const LoginForm: React.FC = () => {
   const navigate = useNavigate();
@@ -40,9 +41,11 @@ const LoginForm: React.FC = () => {
           </div>
 
           <div className="relative z-10 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white text-primary-700 shadow-lg">
-              <Trophy size={28} />
-            </div>
+            <img
+              src={logoSrc}
+              alt="Gestión Deportiva"
+              className="h-14 w-14 rounded-lg bg-white object-contain p-1 shadow-lg"
+            />
             <div>
               <p className="text-sm font-bold uppercase tracking-wide text-primary-100">
                 Universidad
@@ -82,9 +85,11 @@ const LoginForm: React.FC = () => {
         <section className="flex items-center justify-center bg-slate-50 p-4 text-gray-900 sm:p-8">
           <div className="w-full max-w-md">
             <div className="mb-8 flex items-center gap-3 lg:hidden">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-600 text-white">
-                <Trophy size={24} />
-              </div>
+              <img
+                src={logoSrc}
+                alt="Gestión Deportiva"
+                className="h-12 w-12 rounded-lg object-contain"
+              />
               <div>
                 <h1 className="text-xl font-bold">Gestión Deportiva</h1>
                 <p className="text-sm text-gray-500">Panel universitario</p>

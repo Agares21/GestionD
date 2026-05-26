@@ -5,6 +5,7 @@ import { Button, Input, Modal, Card, Table, Select } from "@components/common";
 import { CalendarDays, Edit2, Plus, Trash2 } from "lucide-react";
 import { equipoService } from "@services/equipoService";
 import { torneoService } from "@services/tournamentService";
+import { disciplinaService } from "@services/disciplinaService";
 
 const MatchResultsList: React.FC = () => {
   const {
@@ -189,9 +190,9 @@ export const FixtureList: React.FC = () => {
     },
     {
       key: "cancha",
-      title: "Cancha",
+      title: "Disciplina",
       render: (_value: unknown, record: Partido) =>
-        record.cancha?.nombre || "Sin cancha",
+        record.cancha?.nombre || "Sin disciplina",
     },
     {
       key: "estado",
@@ -247,7 +248,7 @@ export const FixtureList: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Fixture</h1>
           <p className="text-gray-600">
-            Programa partidos, fechas, horarios y sedes del torneo.
+            Programa partidos, fechas, horarios y disciplinas del torneo.
           </p>
         </div>
         <Button
@@ -303,6 +304,7 @@ const FixtureModal: React.FC<FixtureModalProps> = ({
 }) => {
   const [torneos, setTorneos] = useState<any[]>([]);
   const [equipos, setEquipos] = useState<any[]>([]);
+  const [disciplinas, setDisciplinas] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     torneo_id: "",
     ronda: "1",
@@ -315,12 +317,15 @@ const FixtureModal: React.FC<FixtureModalProps> = ({
 
   useEffect(() => {
     const loadOptions = async () => {
-      const [torneosResponse, equiposResponse] = await Promise.all([
-        torneoService.obtenerTorneos(),
-        equipoService.obtenerEquipos(),
-      ]);
+      const [torneosResponse, equiposResponse, disciplinasResponse] =
+        await Promise.all([
+          torneoService.obtenerTorneos(),
+          equipoService.obtenerEquipos(),
+          disciplinaService.obtenerDisciplinas(),
+        ]);
       setTorneos(torneosResponse.data);
       setEquipos(equiposResponse.data);
+      setDisciplinas(disciplinasResponse.data);
     };
 
     if (isOpen) {
@@ -439,10 +444,14 @@ const FixtureModal: React.FC<FixtureModalProps> = ({
             onChange={(e) => setFormData({ ...formData, hora: e.target.value })}
           />
         </div>
-        <Input
-          label="Estadio"
+        <Select
+          label="Disciplina"
           value={formData.estadio}
           onChange={(e) => setFormData({ ...formData, estadio: e.target.value })}
+          options={disciplinas.map((disciplina) => ({
+            value: disciplina.nombre,
+            label: disciplina.nombre,
+          }))}
           fullWidth
         />
         <div className="flex gap-3 pt-4">
