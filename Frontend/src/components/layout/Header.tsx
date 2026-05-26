@@ -17,6 +17,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     navigate("/login");
   };
 
+  const goToProfile = () => {
+    setShowDropdown(false);
+    navigate("/perfil");
+  };
+
   return (
     <header className="bg-white shadow-md sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -29,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               <Menu size={24} />
             </button>
             <h1 className="text-2xl font-bold text-primary-600">
-              ⚽ Gestión Deportiva
+              Gestion Deportiva
             </h1>
           </div>
 
@@ -45,7 +50,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             {showDropdown && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
                 <button
-                  onClick={() => navigate("/perfil")}
+                  onClick={goToProfile}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
                 >
                   <User size={16} />
@@ -56,7 +61,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   className="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 flex items-center gap-2"
                 >
                   <LogOut size={16} />
-                  Cerrar Sesión
+                  Cerrar Sesion
                 </button>
               </div>
             )}

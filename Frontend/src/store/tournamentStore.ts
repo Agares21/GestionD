@@ -16,6 +16,9 @@ interface TournamentState {
   obtenerPartidos: (params?: any) => Promise<void>;
   obtenerPartidosPorTorneo: (torneoId: number) => Promise<void>;
   registrarResultado: (partidoId: number, resultado: any) => Promise<void>;
+  crearPartido: (data: Partial<Partido>) => Promise<void>;
+  actualizarPartido: (id: number, data: Partial<Partido>) => Promise<void>;
+  eliminarPartido: (id: number) => Promise<void>;
   limpiar: () => void;
   setError: (error: string | null) => void;
 }
@@ -54,8 +57,11 @@ export const useTournamentStore = create<TournamentState>((set) => ({
   crearTorneo: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      await torneoService.crearTorneo(data);
-      set({ isLoading: false });
+      const torneo = await torneoService.crearTorneo(data);
+      set((state) => ({
+        torneos: [...state.torneos, torneo],
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al crear torneo";
@@ -68,7 +74,11 @@ export const useTournamentStore = create<TournamentState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const torneo = await torneoService.actualizarTorneo(id, data);
-      set({ torneo, isLoading: false });
+      set((state) => ({
+        torneo,
+        torneos: state.torneos.map((item) => (item.id === id ? torneo : item)),
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al actualizar torneo";
@@ -121,10 +131,64 @@ export const useTournamentStore = create<TournamentState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       await partidoService.registrarResultado(partidoId, resultado);
-      set({ isLoading: false });
+      const partido = await partidoService.obtenerPartido(partidoId);
+      set((state) => ({
+        partidos: state.partidos.map((item) =>
+          item.id === partidoId ? partido : item,
+        ),
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al registrar resultado";
+      set({ error: errorMessage, isLoading: false });
+      throw error;
+    }
+  },
+
+  crearPartido: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const partido = await partidoService.crearPartido(data);
+      set((state) => ({
+        partidos: [...state.partidos, partido],
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message || "Error al crear partido";
+      set({ error: errorMessage, isLoading: false });
+      throw error;
+    }
+  },
+
+  actualizarPartido: async (id, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const partido = await partidoService.actualizarPartido(id, data);
+      set((state) => ({
+        partidos: state.partidos.map((item) => (item.id === id ? partido : item)),
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message || "Error al actualizar partido";
+      set({ error: errorMessage, isLoading: false });
+      throw error;
+    }
+  },
+
+  eliminarPartido: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await partidoService.eliminarPartido(id);
+      set((state) => ({
+        partidos: state.partidos.filter((item) => item.id !== id),
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message || "Error al eliminar partido";
       set({ error: errorMessage, isLoading: false });
       throw error;
     }

@@ -49,8 +49,11 @@ export const useEquipoStore = create<EquipoState>((set) => ({
   crearEquipo: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      await equipoService.crearEquipo(data);
-      set({ isLoading: false });
+      const equipo = await equipoService.crearEquipo(data);
+      set((state) => ({
+        equipos: [...state.equipos, equipo],
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al crear equipo";
@@ -63,7 +66,11 @@ export const useEquipoStore = create<EquipoState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const equipo = await equipoService.actualizarEquipo(id, data);
-      set({ equipo, isLoading: false });
+      set((state) => ({
+        equipo,
+        equipos: state.equipos.map((item) => (item.id === id ? equipo : item)),
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al actualizar equipo";

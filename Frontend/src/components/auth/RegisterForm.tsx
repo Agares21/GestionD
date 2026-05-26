@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "@store/authStore";
-import { Button, Input, Alert } from "@components/common";
+import { Button, Input, Alert, Select } from "@components/common";
+import { authService } from "@services/authService";
 
 interface RegisterFormData {
   nombre: string;
@@ -9,6 +10,7 @@ interface RegisterFormData {
   carnet: string;
   email: string;
   celular: string;
+  rol: "JUGADOR" | "ADMIN" | "DELEGADO";
   password: string;
   passwordConfirm: string;
 }
@@ -22,13 +24,16 @@ const RegisterForm: React.FC = () => {
     carnet: "",
     email: "",
     celular: "",
+    rol: "JUGADOR",
     password: "",
     passwordConfirm: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -78,25 +83,15 @@ const RegisterForm: React.FC = () => {
     }
 
     try {
-      const response = await fetch("http://localhost:3001/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          nombre: formData.nombre,
-          apellido: formData.apellido,
-          carnet: formData.carnet,
-          email: formData.email,
+      await authService.register({
+        nombre: formData.nombre,
+        apellido: formData.apellido,
+        carnet: formData.carnet,
+        email: formData.email,
           celular: formData.celular,
+          rol: formData.rol,
           password: formData.password,
-        }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Error al registrarse");
-      }
 
       setSuccess("¡Registro exitoso! Redirigiendo al login...");
       setTimeout(() => {
@@ -114,7 +109,7 @@ const RegisterForm: React.FC = () => {
           ⚽ Registro
         </h1>
         <p className="text-gray-600 text-center mb-8">
-          Crear nueva cuenta como Jugador
+          Crear nueva cuenta
         </p>
 
         {error && (
@@ -191,6 +186,20 @@ const RegisterForm: React.FC = () => {
             required
           />
 
+          <Select
+            label="Rol"
+            name="rol"
+            value={formData.rol}
+            onChange={handleChange}
+            options={[
+              { value: "JUGADOR", label: "Jugador" },
+              { value: "DELEGADO", label: "Delegado" },
+              { value: "ADMIN", label: "Administrador" },
+            ]}
+            fullWidth
+            required
+          />
+
           <Input
             label="Contraseña"
             type="password"
@@ -220,7 +229,7 @@ const RegisterForm: React.FC = () => {
             size="lg"
             isLoading={isLoading}
           >
-            Registrarse como Jugador
+            Registrarse
           </Button>
         </form>
 

@@ -3,9 +3,10 @@ import { useTournamentStore } from "@store/tournamentStore";
 import { Button, Input, Select, Modal, Card, Table } from "@components/common";
 import { Torneo } from "@types";
 import { Plus, Edit2, Trash2 } from "lucide-react";
+import { disciplinaService } from "@services/disciplinaService";
 
 const TournamentList: React.FC = () => {
-  const { torneos, isLoading, obtenerTorneos, eliminarTorneo } =
+  const { torneos, isLoading, obtenerTorneos, obtenerTorneo, eliminarTorneo } =
     useTournamentStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -53,12 +54,16 @@ const TournamentList: React.FC = () => {
     {
       key: "acciones",
       title: "Acciones",
-      render: (_, record: Torneo) => (
+      render: (_value: unknown, record: Torneo) => (
         <div className="flex gap-2">
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => setEditingId(record.id)}
+            onClick={async () => {
+              await obtenerTorneo(record.id);
+              setEditingId(record.id);
+              setIsModalOpen(true);
+            }}
           >
             <Edit2 size={16} />
           </Button>
@@ -118,17 +123,34 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
   const { crearTorneo, actualizarTorneo, torneo } = useTournamentStore();
   const [nombre, setNombre] = useState("");
   const [descripcion, setDescripcion] = useState("");
-  const [estado, setEstado] = useState("planeado");
+  const [estado, setEstado] = useState<Torneo["estado"]>("planeado");
+  const [disciplinaId, setDisciplinaId] = useState("");
+  const [disciplinas, setDisciplinas] = useState<
+    Array<{ id: number; nombre: string }>
+  >([]);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      const response = await disciplinaService.obtenerDisciplinas();
+      setDisciplinas(response.data);
+    };
+
+    if (isOpen) {
+      loadOptions();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (editingId && torneo) {
       setNombre(torneo.nombre);
       setDescripcion(torneo.descripcion);
       setEstado(torneo.estado);
+      setDisciplinaId(String((torneo as any).disciplina_id ?? torneo.disciplina?.id ?? ""));
     } else {
       setNombre("");
       setDescripcion("");
       setEstado("planeado");
+      setDisciplinaId("");
     }
   }, [editingId, torneo]);
 
@@ -136,9 +158,19 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
     e.preventDefault();
     try {
       if (editingId) {
-        await actualizarTorneo(editingId, { nombre, descripcion, estado });
+        await actualizarTorneo(editingId, {
+          nombre,
+          descripcion,
+          estado,
+          disciplina_id: Number(disciplinaId),
+        } as Partial<Torneo>);
       } else {
-        await crearTorneo({ nombre, descripcion, estado });
+        await crearTorneo({
+          nombre,
+          descripcion,
+          estado,
+          disciplina_id: Number(disciplinaId),
+        } as Partial<Torneo>);
       }
       onClose();
     } catch (error) {
@@ -172,13 +204,25 @@ const TournamentFormModal: React.FC<TournamentFormModalProps> = ({
         <Select
           label="Estado"
           value={estado}
-          onChange={(e) => setEstado(e.target.value)}
+          onChange={(e) => setEstado(e.target.value as Torneo["estado"])}
           options={[
             { value: "planeado", label: "Planeado" },
             { value: "en_curso", label: "En Curso" },
             { value: "finalizado", label: "Finalizado" },
           ]}
           fullWidth
+        />
+
+        <Select
+          label="Disciplina"
+          value={disciplinaId}
+          onChange={(e) => setDisciplinaId(e.target.value)}
+          options={disciplinas.map((disciplina) => ({
+            value: disciplina.id,
+            label: disciplina.nombre,
+          }))}
+          fullWidth
+          required
         />
 
         <div className="flex gap-3 pt-4">

@@ -8,4 +8,7 @@ export { default as TournamentsPage } from "./TournamentsPage";
 export { default as ResultsPage } from "./ResultsPage";
 export { default as AdminPage } from "./AdminPage";
 export { default as CMSPage } from "./CMSPage";
+export { default as DisciplinesPage } from "./DisciplinesPage";
+export { default as SettingsPage } from "./SettingsPage";
+export { default as ProfilePage } from "./ProfilePage";
 export { default as NotFoundPage } from "./NotFoundPage";

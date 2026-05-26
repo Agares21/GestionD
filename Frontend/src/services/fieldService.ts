@@ -1,6 +1,11 @@
 import { apiClient } from "./api";
 import { Cancha, Reserva, PaginatedResponse } from "@types";
 
+export type ReservaPayload = Partial<Reserva> & {
+  cancha_id?: number;
+  equipo_id?: number;
+};
+
 export const canchaService = {
   async obtenerCanchas(params?: any): Promise<PaginatedResponse<Cancha>> {
     return apiClient.getPaginated<Cancha>("/cancha", params);
@@ -17,7 +22,7 @@ export const canchaService = {
   },
 
   async actualizarCancha(id: number, data: Partial<Cancha>): Promise<Cancha> {
-    const response = await apiClient.put<Cancha>(`/cancha/${id}`, data);
+    const response = await apiClient.patch<Cancha>(`/cancha/${id}`, data);
     return response.data!;
   },
 
@@ -36,16 +41,16 @@ export const reservaService = {
     return response.data!;
   },
 
-  async crearReserva(data: Partial<Reserva>): Promise<Reserva> {
+  async crearReserva(data: ReservaPayload): Promise<Reserva> {
     const response = await apiClient.post<Reserva>("/reserva", data);
     return response.data!;
   },
 
   async actualizarReserva(
     id: number,
-    data: Partial<Reserva>,
+    data: ReservaPayload,
   ): Promise<Reserva> {
-    const response = await apiClient.put<Reserva>(`/reserva/${id}`, data);
+    const response = await apiClient.patch<Reserva>(`/reserva/${id}`, data);
     return response.data!;
   },
 
@@ -54,6 +59,10 @@ export const reservaService = {
       estado: "cancelada",
       observaciones: motivo,
     });
+  },
+
+  async eliminarReserva(id: number): Promise<void> {
+    await apiClient.delete(`/reserva/${id}`);
   },
 
   async obtenerDisponibilidad(canchaId: number, fecha: string): Promise<any[]> {

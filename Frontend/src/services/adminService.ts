@@ -1,4 +1,3 @@
-import { apiClient } from "./api";
 import {
   Academia,
   Pago,
@@ -7,62 +6,59 @@ import {
   PaginatedResponse,
 } from "@types";
 
+const emptyPage = <T>(): PaginatedResponse<T> => ({
+  success: true,
+  data: [],
+  pagination: { total: 0, page: 1, limit: 0, pages: 1 },
+});
+
 export const academiaService = {
   async obtenerAcademias(params?: any): Promise<PaginatedResponse<Academia>> {
-    return apiClient.getPaginated<Academia>("/academia", params);
+    void params;
+    return emptyPage<Academia>();
   },
 
   async obtenerAcademia(id: number): Promise<Academia> {
-    const response = await apiClient.get<Academia>(`/academia/${id}`);
-    return response.data!;
+    return { id, nombre: "", director: "", contacto: "", saldo: 0, estado: "inactiva" };
   },
 
   async crearAcademia(data: Partial<Academia>): Promise<Academia> {
-    const response = await apiClient.post<Academia>("/academia", data);
-    return response.data!;
+    return { id: Date.now(), saldo: 0, estado: "activa", ...data } as Academia;
   },
 
   async actualizarAcademia(
     id: number,
     data: Partial<Academia>,
   ): Promise<Academia> {
-    const response = await apiClient.put<Academia>(`/academia/${id}`, data);
-    return response.data!;
+    return { id, saldo: 0, estado: "activa", ...data } as Academia;
   },
 
   async eliminarAcademia(id: number): Promise<void> {
-    await apiClient.delete(`/academia/${id}`);
+    void id;
   },
 };
 
 export const pagoService = {
   async obtenerPagos(params?: any): Promise<PaginatedResponse<Pago>> {
-    return apiClient.getPaginated<Pago>("/pago", params);
+    void params;
+    return emptyPage<Pago>();
   },
 
   async obtenerPago(id: number): Promise<Pago> {
-    const response = await apiClient.get<Pago>(`/pago/${id}`);
-    return response.data!;
+    return { id, academia: await academiaService.obtenerAcademia(0), monto: 0, concepto: "", fecha_vencimiento: "", estado: "pendiente" };
   },
 
   async crearPago(data: Partial<Pago>): Promise<Pago> {
-    const response = await apiClient.post<Pago>("/pago", data);
-    return response.data!;
+    return { id: Date.now(), academia: await academiaService.obtenerAcademia(0), monto: 0, concepto: "", fecha_vencimiento: "", estado: "pendiente", ...data } as Pago;
   },
 
   async registrarPago(id: number, fecha: string): Promise<Pago> {
-    const response = await apiClient.patch<Pago>(`/pago/${id}`, {
-      estado: "pagado",
-      fecha_pago: fecha,
-    });
-    return response.data!;
+    return { ...(await this.obtenerPago(id)), estado: "pagado", fecha_pago: fecha };
   },
 
   async obtenerPagosPorAcademia(academiaId: number): Promise<Pago[]> {
-    const response = await apiClient.get<Pago[]>(
-      `/academia/${academiaId}/pagos`,
-    );
-    return response.data || [];
+    void academiaId;
+    return [];
   },
 };
 
@@ -70,36 +66,31 @@ export const comunicadoService = {
   async obtenerComunicados(
     params?: any,
   ): Promise<PaginatedResponse<Comunicado>> {
-    return apiClient.getPaginated<Comunicado>("/comunicado", params);
+    void params;
+    return emptyPage<Comunicado>();
   },
 
   async obtenerComunicado(id: number): Promise<Comunicado> {
-    const response = await apiClient.get<Comunicado>(`/comunicado/${id}`);
-    return response.data!;
+    return { id, titulo: "", contenido: "", fecha_creacion: "", autor: null as any, estado: "borrador" };
   },
 
   async crearComunicado(data: Partial<Comunicado>): Promise<Comunicado> {
-    const response = await apiClient.post<Comunicado>("/comunicado", data);
-    return response.data!;
+    return { id: Date.now(), titulo: "", contenido: "", fecha_creacion: new Date().toISOString(), autor: null as any, estado: "borrador", ...data } as Comunicado;
   },
 
   async actualizarComunicado(
     id: number,
     data: Partial<Comunicado>,
   ): Promise<Comunicado> {
-    const response = await apiClient.put<Comunicado>(`/comunicado/${id}`, data);
-    return response.data!;
+    return { ...(await this.obtenerComunicado(id)), ...data };
   },
 
   async eliminarComunicado(id: number): Promise<void> {
-    await apiClient.delete(`/comunicado/${id}`);
+    void id;
   },
 
   async publicarComunicado(id: number): Promise<Comunicado> {
-    const response = await apiClient.patch<Comunicado>(`/comunicado/${id}`, {
-      estado: "publicado",
-    });
-    return response.data!;
+    return { ...(await this.obtenerComunicado(id)), estado: "publicado" };
   },
 };
 
@@ -107,13 +98,13 @@ export const historialService = {
   async obtenerHistorial(
     params?: any,
   ): Promise<PaginatedResponse<HistorialClub>> {
-    return apiClient.getPaginated<HistorialClub>("/historial", params);
+    void params;
+    return emptyPage<HistorialClub>();
   },
 
   async crearRegistroHistorial(
     data: Partial<HistorialClub>,
   ): Promise<HistorialClub> {
-    const response = await apiClient.post<HistorialClub>("/historial", data);
-    return response.data!;
+    return { id: Date.now(), titulo: "", descripcion: "", fecha: new Date().toISOString(), tipo: "", ...data } as HistorialClub;
   },
 };

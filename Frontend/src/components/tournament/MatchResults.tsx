@@ -1,14 +1,26 @@
 import React, { useEffect, useState } from "react";
 import { Partido } from "@types";
 import { useTournamentStore } from "@store/tournamentStore";
-import { Button, Input, Modal, Card, Table } from "@components/common";
-import { Plus } from "lucide-react";
+import { Button, Input, Modal, Card, Table, Select } from "@components/common";
+import { Edit2, Plus, Trash2 } from "lucide-react";
+import { equipoService } from "@services/equipoService";
+import { torneoService } from "@services/tournamentService";
 
 const MatchResultsList: React.FC = () => {
-  const { partidos, isLoading, obtenerPartidos, registrarResultado } =
+  const {
+    partidos,
+    isLoading,
+    obtenerPartidos,
+    registrarResultado,
+    crearPartido,
+    actualizarPartido,
+    eliminarPartido,
+  } =
     useTournamentStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<Partido | null>(null);
+  const [editingFixture, setEditingFixture] = useState<Partido | null>(null);
 
   useEffect(() => {
     obtenerPartidos();
@@ -49,19 +61,40 @@ const MatchResultsList: React.FC = () => {
     {
       key: "acciones",
       title: "Acciones",
-      render: (_, record: Partido) => (
-        <Button
-          size="sm"
-          variant={record.estado === "finalizado" ? "secondary" : "primary"}
-          onClick={() => {
-            setSelectedMatch(record);
-            setIsModalOpen(true);
-          }}
-        >
-          {record.estado === "finalizado"
-            ? "Ver Resultado"
-            : "Registrar Resultado"}
-        </Button>
+      render: (_value: unknown, record: Partido) => (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={record.estado === "finalizado" ? "secondary" : "primary"}
+            onClick={() => {
+              setSelectedMatch(record);
+              setIsModalOpen(true);
+            }}
+          >
+            {record.estado === "finalizado" ? "Resultado" : "Registrar"}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setEditingFixture(record);
+              setIsFixtureModalOpen(true);
+            }}
+          >
+            <Edit2 size={16} />
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => {
+              if (window.confirm("¿Eliminar partido?")) {
+                eliminarPartido(record.id);
+              }
+            }}
+          >
+            <Trash2 size={16} />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -72,6 +105,17 @@ const MatchResultsList: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900">
           Resultados de Partidos
         </h1>
+        <Button
+          variant="primary"
+          className="gap-2"
+          onClick={() => {
+            setEditingFixture(null);
+            setIsFixtureModalOpen(true);
+          }}
+        >
+          <Plus size={20} />
+          Nuevo Partido
+        </Button>
       </div>
 
       <Card>
@@ -93,7 +137,195 @@ const MatchResultsList: React.FC = () => {
           }
         }}
       />
+
+      <FixtureModal
+        isOpen={isFixtureModalOpen}
+        onClose={() => {
+          setIsFixtureModalOpen(false);
+          setEditingFixture(null);
+        }}
+        partido={editingFixture}
+        onSubmit={async (data) => {
+          if (editingFixture) {
+            await actualizarPartido(editingFixture.id, data);
+          } else {
+            await crearPartido(data);
+          }
+          setIsFixtureModalOpen(false);
+          setEditingFixture(null);
+        }}
+      />
     </div>
+  );
+};
+
+interface FixtureModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  partido: Partido | null;
+  onSubmit: (data: any) => Promise<void>;
+}
+
+const FixtureModal: React.FC<FixtureModalProps> = ({
+  isOpen,
+  onClose,
+  partido,
+  onSubmit,
+}) => {
+  const [torneos, setTorneos] = useState<any[]>([]);
+  const [equipos, setEquipos] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    torneo_id: "",
+    ronda: "1",
+    equipo_local_id: "",
+    equipo_visitante_id: "",
+    fecha: "",
+    hora: "",
+    estadio: "",
+  });
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      const [torneosResponse, equiposResponse] = await Promise.all([
+        torneoService.obtenerTorneos(),
+        equipoService.obtenerEquipos(),
+      ]);
+      setTorneos(torneosResponse.data);
+      setEquipos(equiposResponse.data);
+    };
+
+    if (isOpen) {
+      loadOptions();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (partido) {
+      setFormData({
+        torneo_id: String((partido as any).torneo_id ?? partido.torneo?.id ?? ""),
+        ronda: String((partido as any).ronda ?? "1"),
+        equipo_local_id: String(
+          (partido as any).equipo_local_id ?? partido.equipo_local?.id ?? "",
+        ),
+        equipo_visitante_id: String(
+          (partido as any).equipo_visitante_id ?? partido.equipo_visitante?.id ?? "",
+        ),
+        fecha: partido.fecha ?? "",
+        hora: partido.hora ?? "",
+        estadio: partido.cancha?.nombre ?? (partido as any).estadio ?? "",
+      });
+    } else {
+      setFormData({
+        torneo_id: "",
+        ronda: "1",
+        equipo_local_id: "",
+        equipo_visitante_id: "",
+        fecha: "",
+        hora: "",
+        estadio: "",
+      });
+    }
+  }, [partido, isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await onSubmit({
+      torneo_id: Number(formData.torneo_id),
+      ronda: Number(formData.ronda),
+      equipo_local_id: formData.equipo_local_id
+        ? Number(formData.equipo_local_id)
+        : undefined,
+      equipo_visitante_id: formData.equipo_visitante_id
+        ? Number(formData.equipo_visitante_id)
+        : undefined,
+      fecha: formData.fecha,
+      hora: formData.hora,
+      estadio: formData.estadio,
+    });
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={partido ? "Editar Partido" : "Nuevo Partido"}
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Select
+          label="Torneo"
+          value={formData.torneo_id}
+          onChange={(e) => setFormData({ ...formData, torneo_id: e.target.value })}
+          options={torneos.map((torneo) => ({
+            value: torneo.id,
+            label: torneo.nombre,
+          }))}
+          fullWidth
+          required
+        />
+        <Input
+          label="Ronda"
+          type="number"
+          value={formData.ronda}
+          onChange={(e) => setFormData({ ...formData, ronda: e.target.value })}
+          fullWidth
+          required
+          min={1}
+        />
+        <Select
+          label="Equipo Local"
+          value={formData.equipo_local_id}
+          onChange={(e) =>
+            setFormData({ ...formData, equipo_local_id: e.target.value })
+          }
+          options={equipos.map((equipo) => ({
+            value: equipo.id,
+            label: equipo.nombre,
+          }))}
+          fullWidth
+        />
+        <Select
+          label="Equipo Visitante"
+          value={formData.equipo_visitante_id}
+          onChange={(e) =>
+            setFormData({ ...formData, equipo_visitante_id: e.target.value })
+          }
+          options={equipos.map((equipo) => ({
+            value: equipo.id,
+            label: equipo.nombre,
+          }))}
+          fullWidth
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Input
+            label="Fecha"
+            type="date"
+            value={formData.fecha}
+            onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+            required
+          />
+          <Input
+            label="Hora"
+            type="time"
+            value={formData.hora}
+            onChange={(e) => setFormData({ ...formData, hora: e.target.value })}
+          />
+        </div>
+        <Input
+          label="Estadio"
+          value={formData.estadio}
+          onChange={(e) => setFormData({ ...formData, estadio: e.target.value })}
+          fullWidth
+        />
+        <div className="flex gap-3 pt-4">
+          <Button variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button variant="primary" type="submit">
+            {partido ? "Actualizar" : "Crear"} Partido
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

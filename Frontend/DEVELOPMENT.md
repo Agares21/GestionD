@@ -14,7 +14,7 @@ npm install
 Copia `.env.example` a `.env` y configura:
 
 ```bash
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:3005
 ```
 
 ### 3. Iniciar Servidor de Desarrollo
@@ -23,7 +23,7 @@ VITE_API_URL=http://localhost:3001/api
 npm run dev
 ```
 
-Accede a `http://localhost:3000`
+Accede a `http://localhost:5173`
 
 ## Credenciales de Prueba
 
@@ -196,7 +196,7 @@ Verifica los alias en `vite.config.ts` y `tsconfig.json`
 
 ### Error: "API not found"
 
-Asegúrate que el backend esté corriendo en `http://localhost:3001`
+Asegúrate que el backend esté corriendo en `http://localhost:3005`
 
 ### Token expirado
 

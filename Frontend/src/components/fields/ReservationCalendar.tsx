@@ -1,18 +1,28 @@
 import React, { useEffect, useState } from "react";
-import { Calendar, MapPin, Clock } from "lucide-react";
-import { Reserva } from "@types";
+import { Calendar, MapPin, Clock, Edit2, Trash2 } from "lucide-react";
 import { useReservationStore } from "@store/reservationStore";
 import { Button, Card, Modal, Input, Select } from "@components/common";
 import { canchaService } from "@services/fieldService";
+import { equipoService } from "@services/equipoService";
 
 const ReservationCalendar: React.FC = () => {
-  const { reservas, obtenerReservas, crearReserva, cancelarReserva } =
+  const {
+    reservas,
+    obtenerReservas,
+    crearReserva,
+    actualizarReserva,
+    cancelarReserva,
+    eliminarReserva,
+  } =
     useReservationStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [canchas, setCanchas] = useState<any[]>([]);
+  const [equipos, setEquipos] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     cancha_id: "",
+    equipo_id: "",
     fecha: "",
     hora_inicio: "",
     hora_fin: "",
@@ -21,6 +31,7 @@ const ReservationCalendar: React.FC = () => {
   useEffect(() => {
     obtenerReservas({ fecha: selectedDate.toISOString().split("T")[0] });
     cargarCanchas();
+    cargarEquipos();
   }, [selectedDate, obtenerReservas]);
 
   const cargarCanchas = async () => {
@@ -32,16 +43,33 @@ const ReservationCalendar: React.FC = () => {
     }
   };
 
+  const cargarEquipos = async () => {
+    try {
+      const response = await equipoService.obtenerEquipos();
+      setEquipos(response.data);
+    } catch (error) {
+      console.error("Error al cargar equipos:", error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await crearReserva({
+      const payload = {
         ...formData,
         cancha_id: parseInt(formData.cancha_id),
-      });
+        equipo_id: formData.equipo_id ? parseInt(formData.equipo_id) : undefined,
+      };
+      if (editingId) {
+        await actualizarReserva(editingId, payload);
+      } else {
+        await crearReserva(payload);
+      }
       setIsModalOpen(false);
+      setEditingId(null);
       setFormData({
         cancha_id: "",
+        equipo_id: "",
         fecha: "",
         hora_inicio: "",
         hora_fin: "",
@@ -50,6 +78,30 @@ const ReservationCalendar: React.FC = () => {
     } catch (error) {
       console.error("Error:", error);
     }
+  };
+
+  const openCreate = () => {
+    setEditingId(null);
+    setFormData({
+      cancha_id: "",
+      equipo_id: "",
+      fecha: selectedDate.toISOString().split("T")[0],
+      hora_inicio: "",
+      hora_fin: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (reserva: any) => {
+    setEditingId(reserva.id);
+    setFormData({
+      cancha_id: String(reserva.cancha_id ?? reserva.cancha?.id ?? ""),
+      equipo_id: String(reserva.equipo_id ?? reserva.equipo?.id ?? ""),
+      fecha: reserva.fecha,
+      hora_inicio: reserva.hora_inicio,
+      hora_fin: reserva.hora_fin,
+    });
+    setIsModalOpen(true);
   };
 
   const handleDateChange = (days: number) => {
@@ -68,7 +120,7 @@ const ReservationCalendar: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900">Reserva de Canchas</h1>
         <Button
           variant="primary"
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreate}
           className="gap-2"
         >
           <Calendar size={20} />
@@ -127,6 +179,22 @@ const ReservationCalendar: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openEdit(reserva)}
+                    >
+                      <Edit2 size={16} />
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => eliminarReserva(reserva.id)}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
                   {reserva.estado === "pendiente" && (
                     <Button
                       variant="danger"
@@ -147,11 +215,16 @@ const ReservationCalendar: React.FC = () => {
 
       <ReservationModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingId(null);
+        }}
         onSubmit={handleSubmit}
         formData={formData}
         setFormData={setFormData}
         canchas={canchas}
+        equipos={equipos}
+        isEditing={Boolean(editingId)}
       />
     </div>
   );
@@ -164,6 +237,8 @@ interface ReservationModalProps {
   formData: any;
   setFormData: (data: any) => void;
   canchas: any[];
+  equipos: any[];
+  isEditing: boolean;
 }
 
 const ReservationModal: React.FC<ReservationModalProps> = ({
@@ -173,9 +248,15 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
   formData,
   setFormData,
   canchas,
+  equipos,
+  isEditing,
 }) => {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Nueva Reserva">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isEditing ? "Editar Reserva" : "Nueva Reserva"}
+    >
       <form onSubmit={onSubmit} className="space-y-4">
         <Select
           label="Cancha"
@@ -186,6 +267,19 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
           options={canchas.map((c) => ({ value: c.id, label: c.nombre }))}
           fullWidth
           required
+        />
+
+        <Select
+          label="Equipo"
+          value={formData.equipo_id}
+          onChange={(e) =>
+            setFormData({ ...formData, equipo_id: e.target.value })
+          }
+          options={equipos.map((equipo) => ({
+            value: equipo.id,
+            label: equipo.nombre,
+          }))}
+          fullWidth
         />
 
         <Input
@@ -224,7 +318,7 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
             Cancelar
           </Button>
           <Button variant="primary" type="submit">
-            Crear Reserva
+            {isEditing ? "Actualizar" : "Crear"} Reserva
           </Button>
         </div>
       </form>

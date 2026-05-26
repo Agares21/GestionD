@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { Reserva } from "@types";
-import { reservaService } from "@services/fieldService";
+import { ReservaPayload, reservaService } from "@services/fieldService";
 
 interface ReservationState {
   reservas: Reserva[];
@@ -9,9 +9,10 @@ interface ReservationState {
   error: string | null;
   obtenerReservas: (params?: any) => Promise<void>;
   obtenerReserva: (id: number) => Promise<void>;
-  crearReserva: (data: Partial<Reserva>) => Promise<void>;
-  actualizarReserva: (id: number, data: Partial<Reserva>) => Promise<void>;
+  crearReserva: (data: ReservaPayload) => Promise<void>;
+  actualizarReserva: (id: number, data: ReservaPayload) => Promise<void>;
   cancelarReserva: (id: number, motivo: string) => Promise<void>;
+  eliminarReserva: (id: number) => Promise<void>;
   obtenerDisponibilidad: (canchaId: number, fecha: string) => Promise<any[]>;
   limpiar: () => void;
   setError: (error: string | null) => void;
@@ -50,8 +51,11 @@ export const useReservationStore = create<ReservationState>((set) => ({
   crearReserva: async (data) => {
     set({ isLoading: true, error: null });
     try {
-      await reservaService.crearReserva(data);
-      set({ isLoading: false });
+      const reserva = await reservaService.crearReserva(data);
+      set((state) => ({
+        reservas: [...state.reservas, reserva],
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al crear reserva";
@@ -64,7 +68,11 @@ export const useReservationStore = create<ReservationState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const reserva = await reservaService.actualizarReserva(id, data);
-      set({ reserva, isLoading: false });
+      set((state) => ({
+        reserva,
+        reservas: state.reservas.map((item) => (item.id === id ? reserva : item)),
+        isLoading: false,
+      }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al actualizar reserva";
@@ -78,12 +86,32 @@ export const useReservationStore = create<ReservationState>((set) => ({
     try {
       await reservaService.cancelarReserva(id, motivo);
       set((state) => ({
-        reservas: state.reservas.filter((r) => r.id !== id),
+        reservas: state.reservas.map((r) =>
+          r.id === id
+            ? { ...r, estado: "cancelada", observaciones: motivo }
+            : r,
+        ),
         isLoading: false,
       }));
     } catch (error: any) {
       const errorMessage =
         error.response?.data?.message || "Error al cancelar reserva";
+      set({ error: errorMessage, isLoading: false });
+      throw error;
+    }
+  },
+
+  eliminarReserva: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      await reservaService.eliminarReserva(id);
+      set((state) => ({
+        reservas: state.reservas.filter((r) => r.id !== id),
+        isLoading: false,
+      }));
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message || "Error al eliminar reserva";
       set({ error: errorMessage, isLoading: false });
       throw error;
     }

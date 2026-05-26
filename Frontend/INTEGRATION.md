@@ -26,7 +26,7 @@ Deberías ver algo como:
 [Nest] 12345 - 01/01/2024, 10:00:00 PM     LOG [NestFactory] Nest application successfully started +123ms
 ```
 
-Backend corriendo en: **http://localhost:3001**
+Backend corriendo en: **http://localhost:3005**
 
 ### 2️⃣ Iniciar Frontend (Terminal 2)
 
@@ -39,14 +39,14 @@ npm run dev
 Deberías ver algo como:
 
 ```
-Local:        http://localhost:3000/
+Local:        http://localhost:5173/
 ```
 
-Frontend corriendo en: **http://localhost:3000**
+Frontend corriendo en: **http://localhost:5173**
 
 ## Verificar Conexión
 
-### 1. Abrir http://localhost:3000 en tu navegador
+### 1. Abrir http://localhost:5173 en tu navegador
 
 Deberías ver la página de login con el formulario.
 
@@ -102,7 +102,7 @@ npm run start:dev
 ```typescript
 // main.ts del Backend
 app.enableCors({
-  origin: "http://localhost:3000",
+  origin: "http://localhost:5173",
   credentials: true,
 });
 ```
@@ -114,7 +114,7 @@ app.enableCors({
 **Solución**: Verificar `.env`:
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:3005
 ```
 
 Y reiniciar el servidor:
@@ -215,9 +215,9 @@ npm run dev
 
 URLs:
 
-- Frontend: http://localhost:3000
-- Backend: http://localhost:3001
-- API: http://localhost:3001/api
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3005
+- API: http://localhost:3005/api
 
 ### Producción
 
@@ -250,7 +250,7 @@ PORT=3001
 ### Frontend (.env)
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:3005
 ```
 
 ## Datos Simulados

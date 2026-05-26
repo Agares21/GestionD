@@ -1,6 +1,16 @@
 import { apiClient } from "./api";
 import { LoginCredentials, AuthResponse, Usuario } from "@types";
 
+export interface RegisterPayload {
+  nombre: string;
+  apellido: string;
+  carnet: string;
+  email: string;
+  celular: string;
+  password: string;
+  rol: "JUGADOR" | "ADMIN" | "DELEGADO";
+}
+
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>(
@@ -8,17 +18,26 @@ export const authService = {
       credentials,
     );
     if (response.data) {
+      const usuario = response.data.usuario || response.data.user;
       apiClient.setToken(response.data.access_token);
       localStorage.setItem("token", response.data.access_token);
-      localStorage.setItem("usuario", JSON.stringify(response.data.usuario));
+      localStorage.setItem("usuario", JSON.stringify(usuario));
     }
-    return response.data!;
+    return {
+      ...response.data!,
+      usuario: response.data!.usuario || response.data!.user,
+    };
   },
 
   async logout(): Promise<void> {
     apiClient.clearToken();
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
+  },
+
+  async register(data: RegisterPayload): Promise<Usuario> {
+    const response = await apiClient.post<Usuario>("/auth/register", data);
+    return response.data!;
   },
 
   async getCurrentUser(): Promise<Usuario> {

@@ -39,7 +39,7 @@ npm install
 npm run dev
 ```
 
-Accede a `http://localhost:3000`
+Accede a `http://localhost:5173`
 
 ## Build para Producción
 
@@ -77,7 +77,7 @@ src/
 Crea un archivo `.env` en la raíz:
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=http://localhost:3005
 ```
 
 ## Roles y Permisos

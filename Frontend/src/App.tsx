@@ -6,6 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useAuthStore } from "@store/authStore";
+import { UserRole } from "@types";
 import { ProtectedRoute } from "@components/auth";
 import {
   LoginPage,
@@ -18,6 +19,9 @@ import {
   ResultsPage,
   AdminPage,
   CMSPage,
+  DisciplinesPage,
+  SettingsPage,
+  ProfilePage,
   NotFoundPage,
 } from "@pages/index";
 
@@ -46,7 +50,7 @@ const App: React.FC = () => {
         <Route
           path="/equipos"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
               <TeamsPage />
             </ProtectedRoute>
           }
@@ -55,7 +59,7 @@ const App: React.FC = () => {
         <Route
           path="/jugadores"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
               <PlayersPage />
             </ProtectedRoute>
           }
@@ -64,7 +68,7 @@ const App: React.FC = () => {
         <Route
           path="/reservas"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
               <ReservationsPage />
             </ProtectedRoute>
           }
@@ -73,7 +77,7 @@ const App: React.FC = () => {
         <Route
           path="/torneos"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
               <TournamentsPage />
             </ProtectedRoute>
           }
@@ -82,8 +86,17 @@ const App: React.FC = () => {
         <Route
           path="/resultados"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN, UserRole.DELEGADO]}>
               <ResultsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/disciplinas"
+          element={
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN]}>
+              <DisciplinesPage />
             </ProtectedRoute>
           }
         />
@@ -91,8 +104,17 @@ const App: React.FC = () => {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN]}>
               <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN]}>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />
@@ -100,8 +122,26 @@ const App: React.FC = () => {
         <Route
           path="/cms"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredRoles={[UserRole.ADMIN]}>
               <CMSPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/perfil"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />

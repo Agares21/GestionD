@@ -3,9 +3,10 @@ import { useEquipoStore } from "@store/equipoStore";
 import { Button, Input, Select, Modal, Card, Table } from "@components/common";
 import { Equipo } from "@types";
 import { Plus, Edit2, Trash2 } from "lucide-react";
+import { carreraService, disciplinaService } from "@services/disciplinaService";
 
 const EquipoList: React.FC = () => {
-  const { equipos, isLoading, obtenerEquipos, eliminarEquipo } =
+  const { equipos, isLoading, obtenerEquipos, obtenerEquipo, eliminarEquipo } =
     useEquipoStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -57,12 +58,16 @@ const EquipoList: React.FC = () => {
     {
       key: "acciones",
       title: "Acciones",
-      render: (_, record: Equipo) => (
+      render: (_value: unknown, record: Equipo) => (
         <div className="flex gap-2">
           <Button
             size="sm"
             variant="secondary"
-            onClick={() => setEditingId(record.id)}
+            onClick={async () => {
+              await obtenerEquipo(record.id);
+              setEditingId(record.id);
+              setIsModalOpen(true);
+            }}
           >
             <Edit2 size={16} />
           </Button>
@@ -122,14 +127,41 @@ const EquipoFormModal: React.FC<EquipoFormModalProps> = ({
   const { crearEquipo, actualizarEquipo, equipo } = useEquipoStore();
   const [nombre, setNombre] = useState("");
   const [categoria, setCategoria] = useState("");
+  const [carreraId, setCarreraId] = useState("");
+  const [disciplinaId, setDisciplinaId] = useState("");
+  const [carreras, setCarreras] = useState<Array<{ id: number; nombre: string }>>(
+    [],
+  );
+  const [disciplinas, setDisciplinas] = useState<
+    Array<{ id: number; nombre: string }>
+  >([]);
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      const [carrerasResponse, disciplinasResponse] = await Promise.all([
+        carreraService.obtenerCarreras(),
+        disciplinaService.obtenerDisciplinas(),
+      ]);
+      setCarreras(carrerasResponse.data);
+      setDisciplinas(disciplinasResponse.data);
+    };
+
+    if (isOpen) {
+      loadOptions();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (editingId && equipo) {
       setNombre(equipo.nombre);
       setCategoria(equipo.categoria);
+      setCarreraId(String((equipo as any).carrera_id ?? ""));
+      setDisciplinaId(String((equipo as any).disciplina_id ?? ""));
     } else {
       setNombre("");
       setCategoria("");
+      setCarreraId("");
+      setDisciplinaId("");
     }
   }, [editingId, equipo]);
 
@@ -137,9 +169,19 @@ const EquipoFormModal: React.FC<EquipoFormModalProps> = ({
     e.preventDefault();
     try {
       if (editingId) {
-        await actualizarEquipo(editingId, { nombre, categoria });
+        await actualizarEquipo(editingId, {
+          nombre,
+          categoria,
+          carrera_id: Number(carreraId),
+          disciplina_id: Number(disciplinaId),
+        } as Partial<Equipo>);
       } else {
-        await crearEquipo({ nombre, categoria });
+        await crearEquipo({
+          nombre,
+          categoria,
+          carrera_id: Number(carreraId),
+          disciplina_id: Number(disciplinaId),
+        } as Partial<Equipo>);
       }
       onClose();
     } catch (error) {
@@ -166,6 +208,30 @@ const EquipoFormModal: React.FC<EquipoFormModalProps> = ({
           label="Categoría"
           value={categoria}
           onChange={(e) => setCategoria(e.target.value)}
+          fullWidth
+          required
+        />
+
+        <Select
+          label="Carrera"
+          value={carreraId}
+          onChange={(e) => setCarreraId(e.target.value)}
+          options={carreras.map((carrera) => ({
+            value: carrera.id,
+            label: carrera.nombre,
+          }))}
+          fullWidth
+          required
+        />
+
+        <Select
+          label="Disciplina"
+          value={disciplinaId}
+          onChange={(e) => setDisciplinaId(e.target.value)}
+          options={disciplinas.map((disciplina) => ({
+            value: disciplina.id,
+            label: disciplina.nombre,
+          }))}
           fullWidth
           required
         />

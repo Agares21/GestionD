@@ -1,32 +1,65 @@
 import { apiClient } from "./api";
 import { Disciplina, PaginatedResponse } from "@types";
 
+export interface Carrera {
+  id: number;
+  nombre: string;
+}
+
+const normalizeText = (value = "") =>
+  value
+    .replace(/FÃºtbol/g, "F\u00fatbol")
+    .replace(/BÃ¡squetbol/g, "B\u00e1squetbol")
+    .replace(/VÃ³ley/g, "V\u00f3ley")
+    .replace(/GestiÃ³n/g, "Gesti\u00f3n")
+    .replace(/ConfiguraciÃ³n/g, "Configuraci\u00f3n");
+
+const toDisciplina = (disciplina: Disciplina): Disciplina => ({
+  ...disciplina,
+  nombre: normalizeText(disciplina.nombre),
+  descripcion: normalizeText(disciplina.descripcion),
+  reglas: normalizeText(disciplina.reglas),
+});
+
 export const disciplinaService = {
   async obtenerDisciplinas(
     params?: any,
   ): Promise<PaginatedResponse<Disciplina>> {
-    return apiClient.getPaginated<Disciplina>("/disciplina", params);
+    const response = await apiClient.getPaginated<Disciplina>("/disciplina", params);
+    return {
+      ...response,
+      data: response.data.map(toDisciplina),
+    };
   },
 
   async obtenerDisciplina(id: number): Promise<Disciplina> {
     const response = await apiClient.get<Disciplina>(`/disciplina/${id}`);
-    return response.data!;
+    return toDisciplina(response.data!);
   },
 
   async crearDisciplina(data: Partial<Disciplina>): Promise<Disciplina> {
     const response = await apiClient.post<Disciplina>("/disciplina", data);
-    return response.data!;
+    return toDisciplina(response.data!);
   },
 
   async actualizarDisciplina(
     id: number,
     data: Partial<Disciplina>,
   ): Promise<Disciplina> {
-    const response = await apiClient.put<Disciplina>(`/disciplina/${id}`, data);
-    return response.data!;
+    const response = await apiClient.patch<Disciplina>(
+      `/disciplina/${id}`,
+      data,
+    );
+    return toDisciplina(response.data!);
   },
 
   async eliminarDisciplina(id: number): Promise<void> {
     await apiClient.delete(`/disciplina/${id}`);
+  },
+};
+
+export const carreraService = {
+  async obtenerCarreras(params?: any): Promise<PaginatedResponse<Carrera>> {
+    return apiClient.getPaginated<Carrera>("/carrera", params);
   },
 };

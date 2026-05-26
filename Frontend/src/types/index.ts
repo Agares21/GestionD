@@ -24,6 +24,7 @@ export interface LoginCredentials {
 export interface AuthResponse {
   access_token: string;
   usuario: Usuario;
+  user?: Usuario;
 }
 
 export interface Academia {
@@ -84,6 +85,8 @@ export interface Cancha {
 
 export interface Reserva {
   id: number;
+  cancha_id?: number;
+  equipo_id?: number;
   cancha: Cancha;
   equipo?: Equipo;
   fecha: string;
