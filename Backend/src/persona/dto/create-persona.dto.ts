@@ -1,24 +1,39 @@
-import { IsString, IsNotEmpty, IsEmail, Matches } from "class-validator";
+import {
+  IsString,
+  IsNotEmpty,
+  IsEmail,
+  Matches,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 export class CreatePersonaDto {
   @ApiProperty({ description: "Nombre de la persona" })
   @IsString()
   @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(80)
   nombre: string;
 
   @ApiProperty({ description: "Apellido de la persona" })
   @IsString()
   @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(80)
   apellido: string;
 
   @ApiProperty({ description: "Número de carnet" })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[A-Za-z0-9-]{5,20}$/, {
+    message: "El carnet debe tener entre 5 y 20 caracteres alfanumericos",
+  })
   carnet: string;
 
-  @ApiProperty({ description: "Email (debe ser @ucb.edu.bo" })
+  @ApiProperty({ description: "Email institucional @ucb.edu.bo" })
   @IsEmail()
+  @IsNotEmpty()
   @Matches(/@ucb\.edu\.bo$/, {
     message: "El email debe ser del dominio @ucb.edu.bo",
   })
@@ -27,5 +42,8 @@ export class CreatePersonaDto {
   @ApiProperty({ description: "Número de celular" })
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[0-9]{7,12}$/, {
+    message: "El celular debe contener entre 7 y 12 digitos",
+  })
   celular: string;
 }

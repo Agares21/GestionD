@@ -12,6 +12,7 @@ const toTorneo = (torneo: any): Torneo => ({
 const toTorneoPayload = (data: Partial<Torneo>) => ({
   nombre: data.nombre ?? "Torneo",
   tipo: (data as any).tipo ?? data.descripcion ?? "Interno",
+  estado: data.estado ?? "planeado",
   disciplina_id: (data as any).disciplina_id ?? data.disciplina?.id ?? 1,
   fecha_inicio: data.fecha_inicio,
   fecha_fin: data.fecha_fin,

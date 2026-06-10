@@ -59,7 +59,7 @@ const LoginForm: React.FC = () => {
               Torneos y reservas
             </p>
             <h2 className="mt-4 text-5xl font-bold leading-tight">
-              Controla equipos, fixture y canchas con una experiencia clara.
+              Administra tus torneos y reservas.
             </h2>
             <div className="mt-8 grid grid-cols-3 gap-3">
               {[

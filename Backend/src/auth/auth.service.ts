@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -104,6 +109,22 @@ export class AuthService {
     password: string,
     role?: string,
   ): Promise<Persona> {
+    if (!password) {
+      throw new BadRequestException("La contrasena es obligatoria");
+    }
+
+    const existingPersona = await this.personaRepository.findOne({
+      where: [{ email: personaData.email }, { carnet: personaData.carnet }],
+    });
+
+    if (existingPersona?.email === personaData.email) {
+      throw new ConflictException("El email ya esta registrado");
+    }
+
+    if (existingPersona?.carnet === personaData.carnet) {
+      throw new ConflictException("El carnet ya esta registrado");
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const persona = this.personaRepository.create({
@@ -111,7 +132,15 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    const savedPersona = await this.personaRepository.save(persona);
+    let savedPersona: Persona;
+    try {
+      savedPersona = await this.personaRepository.save(persona);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        throw new ConflictException("El email o carnet ya esta registrado");
+      }
+      throw error;
+    }
     const selectedRole = await this.rolRepository.findOne({
       where: { nombre: this.toDatabaseRole(role) },
     });

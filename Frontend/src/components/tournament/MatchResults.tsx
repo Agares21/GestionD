@@ -1,11 +1,553 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Partido } from "@types";
 import { useTournamentStore } from "@store/tournamentStore";
 import { Button, Input, Modal, Card, Table, Select } from "@components/common";
-import { CalendarDays, Edit2, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Download, Edit2, Plus, Trash2 } from "lucide-react";
 import { equipoService } from "@services/equipoService";
 import { torneoService } from "@services/tournamentService";
 import { disciplinaService } from "@services/disciplinaService";
+import logoSrc from "../images/Logo color - azul (1).png";
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+const formatFixtureDate = (value?: string) => {
+  if (!value) return "Sin fecha";
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+const formatGeneratedAt = () =>
+  new Date().toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const roundOptions = [
+  { value: 1, label: "Fase de grupos" },
+  { value: 2, label: "Octavos de final" },
+  { value: 3, label: "Cuartos de final" },
+  { value: 4, label: "Semifinal" },
+  { value: 5, label: "Final" },
+  { value: 6, label: "Tercer lugar" },
+];
+
+const getRoundLabel = (round?: number | string) => {
+  const value = Number(round);
+  return roundOptions.find((option) => option.value === value)?.label ?? `Ronda ${round || "-"}`;
+};
+
+const getTournamentId = (partido: Partido) =>
+  String((partido as any).torneo_id ?? partido.torneo?.id ?? "sin-torneo");
+
+const getTournamentName = (partido: Partido) =>
+  partido.torneo?.nombre || "Sin torneo";
+
+const getTeamName = (team: any, fallback: string) =>
+  team?.nombre || team?.nombre_equipo || fallback;
+
+const toDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+interface StandingRow {
+  teamId: string;
+  teamName: string;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+const createStandingRow = (teamId: string, teamName: string): StandingRow => ({
+  teamId,
+  teamName,
+  played: 0,
+  won: 0,
+  drawn: 0,
+  lost: 0,
+  goalsFor: 0,
+  goalsAgainst: 0,
+  goalDifference: 0,
+  points: 0,
+});
+
+const updateStanding = (
+  row: StandingRow,
+  goalsFor: number,
+  goalsAgainst: number,
+) => {
+  row.played += 1;
+  row.goalsFor += goalsFor;
+  row.goalsAgainst += goalsAgainst;
+  row.goalDifference = row.goalsFor - row.goalsAgainst;
+
+  if (goalsFor > goalsAgainst) {
+    row.won += 1;
+    row.points += 3;
+  } else if (goalsFor === goalsAgainst) {
+    row.drawn += 1;
+    row.points += 1;
+  } else {
+    row.lost += 1;
+  }
+};
+
+const buildStandings = (partidos: Partido[]) => {
+  const table = new Map<string, StandingRow>();
+
+  partidos.forEach((partido) => {
+    const localId = String(
+      (partido as any).equipo_local_id ?? partido.equipo_local?.id ?? "",
+    );
+    const visitanteId = String(
+      (partido as any).equipo_visitante_id ?? partido.equipo_visitante?.id ?? "",
+    );
+
+    if (!localId || !visitanteId || !partido.resultado) return;
+
+    if (!table.has(localId)) {
+      table.set(
+        localId,
+        createStandingRow(
+          localId,
+          getTeamName(partido.equipo_local, "Equipo local"),
+        ),
+      );
+    }
+
+    if (!table.has(visitanteId)) {
+      table.set(
+        visitanteId,
+        createStandingRow(
+          visitanteId,
+          getTeamName(partido.equipo_visitante, "Equipo visitante"),
+        ),
+      );
+    }
+
+    updateStanding(
+      table.get(localId)!,
+      partido.resultado.goles_local,
+      partido.resultado.goles_visitante,
+    );
+    updateStanding(
+      table.get(visitanteId)!,
+      partido.resultado.goles_visitante,
+      partido.resultado.goles_local,
+    );
+  });
+
+  return [...table.values()].sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.goalDifference - a.goalDifference ||
+      b.goalsFor - a.goalsFor ||
+      a.teamName.localeCompare(b.teamName),
+  );
+};
+
+const groupByTournament = (partidos: Partido[]) =>
+  partidos.reduce<Record<string, Partido[]>>((groups, partido) => {
+    const tournamentName = partido.torneo?.nombre || "Sin torneo";
+    return {
+      ...groups,
+      [tournamentName]: [...(groups[tournamentName] || []), partido],
+    };
+  }, {});
+
+const groupByDate = (partidos: Partido[]) =>
+  partidos.reduce<Record<string, Partido[]>>((groups, partido) => {
+    const date = partido.fecha || "Sin fecha";
+    return {
+      ...groups,
+      [date]: [...(groups[date] || []), partido],
+    };
+  }, {});
+
+const getCourtName = (partido: Partido) =>
+  partido.cancha?.nombre || (partido as any).estadio || "Cancha por definir";
+
+const buildMatchCards = (partidos: Partido[]) =>
+  partidos
+    .map(
+      (partido) => `
+        <article class="match-card">
+          <div class="match-time">${escapeHtml(partido.hora || "Sin hora")}</div>
+          <div class="match-teams">
+            <small>${escapeHtml(getRoundLabel((partido as any).ronda))}</small>
+            <strong>${escapeHtml(partido.equipo_local?.nombre || "Equipo local")}</strong>
+            <span>vs</span>
+            <strong>${escapeHtml(partido.equipo_visitante?.nombre || "Equipo visitante")}</strong>
+          </div>
+          <div class="match-court">
+            <span>Cancha</span>
+            <strong>${escapeHtml(getCourtName(partido))}</strong>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+
+const buildTournamentSections = (partidos: Partido[]) => {
+  const tournaments = groupByTournament(partidos);
+
+  return Object.entries(tournaments)
+    .map(([tournamentName, tournamentMatches]) => {
+      const dates = groupByDate(tournamentMatches);
+
+      return `
+        <section class="tournament">
+          <div class="tournament-title">
+            <span>Torneo</span>
+            <h2>${escapeHtml(tournamentName)}</h2>
+          </div>
+          ${Object.entries(dates)
+            .map(
+              ([date, dateMatches]) => `
+                <div class="date-block">
+                  <h3>${escapeHtml(formatFixtureDate(date))}</h3>
+                  <div class="match-list">
+                    ${buildMatchCards(dateMatches)}
+                  </div>
+                </div>
+              `,
+            )
+            .join("")}
+        </section>
+      `;
+    })
+    .join("");
+};
+
+const createPrintFrame = () => {
+  const printFrame = document.createElement("iframe");
+  printFrame.style.position = "fixed";
+  printFrame.style.right = "0";
+  printFrame.style.bottom = "0";
+  printFrame.style.width = "0";
+  printFrame.style.height = "0";
+  printFrame.style.border = "0";
+  document.body.appendChild(printFrame);
+  return printFrame;
+};
+
+const exportFixturePdf = (partidos: Partido[]) => {
+  const sortedPartidos = [...partidos].sort((a, b) =>
+    `${a.fecha || "9999-12-31"} ${a.hora || ""}`.localeCompare(
+      `${b.fecha || "9999-12-31"} ${b.hora || ""}`,
+    ),
+  );
+  const printFrame = createPrintFrame();
+  const printDocument = printFrame.contentWindow?.document;
+
+  if (!printDocument) {
+    printFrame.remove();
+    window.alert("No se pudo preparar el documento para exportar.");
+    return;
+  }
+
+  printDocument.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Fixture - Gestion Deportiva</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 12mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            margin: 0;
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f8fafc;
+          }
+
+          .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            border-radius: 18px;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 18px 22px;
+            margin-bottom: 16px;
+          }
+
+          .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+          }
+
+          .brand img {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #ffffff;
+            padding: 5px;
+          }
+
+          .eyebrow {
+            margin: 0 0 4px;
+            color: #93c5fd;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+          h1 {
+            margin: 0;
+            font-size: 26px;
+          }
+
+          .meta {
+            color: #cbd5e1;
+            font-size: 12px;
+            text-align: right;
+          }
+
+          .intro {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            border: 1px solid #dbeafe;
+            border-radius: 14px;
+            background: #ffffff;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+          }
+
+          .intro p {
+            margin: 0;
+            color: #475569;
+            font-size: 13px;
+          }
+
+          .count {
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1e3a8a;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 12px;
+            white-space: nowrap;
+          }
+
+          .tournament {
+            break-inside: avoid;
+            border: 1px solid #d1d5db;
+            border-radius: 18px;
+            background: #ffffff;
+            overflow: hidden;
+            margin-bottom: 18px;
+          }
+
+          .tournament-title {
+            background: linear-gradient(135deg, #1d4ed8, #0f766e);
+            color: #ffffff;
+            padding: 16px 20px;
+          }
+
+          .tournament-title span {
+            display: block;
+            color: #bfdbfe;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+          }
+
+          .tournament-title h2 {
+            margin: 4px 0 0;
+            font-size: 24px;
+          }
+
+          .date-block {
+            padding: 16px 18px 2px;
+          }
+
+          .date-block h3 {
+            margin: 0 0 10px;
+            color: #334155;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+
+          .match-list {
+            display: grid;
+            gap: 10px;
+            padding-bottom: 14px;
+          }
+
+          .match-card {
+            display: grid;
+            grid-template-columns: 96px 1fr 170px;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 14px;
+            background: #f8fafc;
+            padding: 12px;
+          }
+
+          .match-time {
+            border-radius: 12px;
+            background: #111827;
+            color: #ffffff;
+            font-size: 19px;
+            font-weight: 800;
+            padding: 12px 8px;
+            text-align: center;
+          }
+
+          .match-teams {
+            display: grid;
+            grid-template-columns: 1fr 36px 1fr;
+            align-items: center;
+            gap: 8px;
+            font-size: 17px;
+            text-align: center;
+          }
+
+          .match-teams small {
+            grid-column: 1 / -1;
+            justify-self: center;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1e3a8a;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            padding: 5px 10px;
+            text-transform: uppercase;
+          }
+
+          .match-teams span {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+
+          .match-court {
+            border-left: 1px solid #d1d5db;
+            padding-left: 12px;
+          }
+
+          .match-court span {
+            display: block;
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+          .match-court strong {
+            display: block;
+            margin-top: 4px;
+            color: #0f172a;
+            font-size: 13px;
+          }
+
+          .empty {
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            background: #ffffff;
+            color: #64748b;
+            padding: 24px;
+            text-align: center;
+          }
+
+          .footer {
+            margin-top: 18px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+            color: #6b7280;
+            font-size: 11px;
+          }
+        </style>
+      </head>
+      <body>
+        <section class="header">
+          <div class="brand">
+            <img src="${logoSrc}" alt="Logo universidad" />
+            <div>
+              <p class="eyebrow">Universidad Catolica Boliviana</p>
+              <h1>Fixture deportivo</h1>
+            </div>
+          </div>
+          <div class="meta">
+            <strong>Gestion Deportiva</strong><br />
+            Emitido: ${escapeHtml(formatGeneratedAt())}
+          </div>
+        </section>
+
+        <section class="intro">
+          <p>Programacion oficial de partidos registrados en el sistema.</p>
+          <span class="count">${sortedPartidos.length} partidos</span>
+        </section>
+
+        ${
+          sortedPartidos.length > 0
+            ? buildTournamentSections(sortedPartidos)
+            : `<div class="empty">No existen partidos registrados.</div>`
+        }
+
+        <p class="footer">
+          Documento generado desde el modulo Fixture del sistema GestionD.
+        </p>
+
+        <script>
+          window.onload = () => {
+            window.focus();
+            setTimeout(() => window.print(), 250);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printDocument.close();
+
+  setTimeout(() => {
+    printFrame.remove();
+  }, 60000);
+};
 
 const MatchResultsList: React.FC = () => {
   const {
@@ -30,6 +572,15 @@ const MatchResultsList: React.FC = () => {
   );
 
   const columns = [
+    {
+      key: "ronda",
+      title: "Etapa",
+      render: (value: number | string) => (
+        <span className="rounded-full bg-primary-50 px-3 py-1 text-sm font-bold text-primary-700">
+          {getRoundLabel(value)}
+        </span>
+      ),
+    },
     {
       key: "fecha",
       title: "Fecha",
@@ -161,10 +712,78 @@ export const FixtureList: React.FC = () => {
     useTournamentStore();
   const [isFixtureModalOpen, setIsFixtureModalOpen] = useState(false);
   const [editingFixture, setEditingFixture] = useState<Partido | null>(null);
+  const [selectedTournamentId, setSelectedTournamentId] = useState("all");
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(
+    toDateKey(new Date()),
+  );
 
   useEffect(() => {
     obtenerPartidos();
   }, [obtenerPartidos]);
+
+  const tournamentOptions = useMemo(() => {
+    const options = new Map<string, string>();
+
+    partidos.forEach((partido) => {
+      options.set(getTournamentId(partido), getTournamentName(partido));
+    });
+
+    return [...options.entries()].map(([id, name]) => ({ id, name }));
+  }, [partidos]);
+
+  const selectedTournamentPartidos = useMemo(
+    () =>
+      selectedTournamentId === "all"
+        ? partidos
+        : partidos.filter(
+            (partido) => getTournamentId(partido) === selectedTournamentId,
+          ),
+    [partidos, selectedTournamentId],
+  );
+
+  const standings = useMemo(
+    () => buildStandings(selectedTournamentPartidos),
+    [selectedTournamentPartidos],
+  );
+
+  const calendarMatches = useMemo(
+    () =>
+      selectedTournamentPartidos
+        .filter((partido) => partido.fecha === selectedCalendarDate)
+        .sort((a, b) => (a.hora || "").localeCompare(b.hora || "")),
+    [selectedCalendarDate, selectedTournamentPartidos],
+  );
+
+  const reportRows = useMemo(
+    () =>
+      standings.map((row) => {
+        const upcoming = selectedTournamentPartidos
+          .filter(
+            (partido) =>
+              !partido.resultado &&
+              [
+                String(
+                  (partido as any).equipo_local_id ??
+                    partido.equipo_local?.id ??
+                    "",
+                ),
+                String(
+                  (partido as any).equipo_visitante_id ??
+                    partido.equipo_visitante?.id ??
+                    "",
+                ),
+              ].includes(row.teamId),
+          )
+          .sort((a, b) =>
+            `${a.fecha || "9999-12-31"} ${a.hora || ""}`.localeCompare(
+              `${b.fecha || "9999-12-31"} ${b.hora || ""}`,
+            ),
+          )[0];
+
+        return { ...row, upcoming };
+      }),
+    [selectedTournamentPartidos, standings],
+  );
 
   const columns = [
     {
@@ -251,21 +870,221 @@ export const FixtureList: React.FC = () => {
             Programa partidos, fechas, horarios y disciplinas del torneo.
           </p>
         </div>
-        <Button
-          variant="primary"
-          className="gap-2"
-          onClick={() => {
-            setEditingFixture(null);
-            setIsFixtureModalOpen(true);
-          }}
-        >
-          <Plus size={20} />
-          Nuevo Partido
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            variant="secondary"
+            className="gap-2"
+            onClick={() => exportFixturePdf(partidos)}
+            disabled={isLoading || partidos.length === 0}
+          >
+            <Download size={20} />
+            Exportar PDF
+          </Button>
+          <Button
+            variant="primary"
+            className="gap-2"
+            onClick={() => {
+              setEditingFixture(null);
+              setIsFixtureModalOpen(true);
+            }}
+          >
+            <Plus size={20} />
+            Nuevo Partido
+          </Button>
+        </div>
       </div>
 
       <Card>
         <Table columns={columns} data={partidos} isLoading={isLoading} />
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <Card>
+          <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="mt-1 text-2xl font-bold text-gray-900">
+                Tabla de posiciones dinamica
+              </h2>
+              <p className="text-sm text-gray-500">
+                Calculada automaticamente desde los resultados registrados.
+              </p>
+            </div>
+            <Select
+              label="Torneo"
+              value={selectedTournamentId}
+              onChange={(e) => setSelectedTournamentId(e.target.value)}
+              options={[
+                { value: "all", label: "Todos los torneos" },
+                ...tournamentOptions.map((torneo) => ({
+                  value: torneo.id,
+                  label: torneo.name,
+                })),
+              ]}
+            />
+          </div>
+
+          {standings.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center text-gray-500">
+              Registra resultados para generar la tabla de posiciones.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full bg-white text-sm">
+                <thead className="bg-gray-50 text-xs uppercase text-gray-600">
+                  <tr>
+                    <th className="px-4 py-3 text-left">#</th>
+                    <th className="px-4 py-3 text-left">Equipo</th>
+                    <th className="px-4 py-3">PJ</th>
+                    <th className="px-4 py-3">PG</th>
+                    <th className="px-4 py-3">PE</th>
+                    <th className="px-4 py-3">PP</th>
+                    <th className="px-4 py-3">GF</th>
+                    <th className="px-4 py-3">GC</th>
+                    <th className="px-4 py-3">DG</th>
+                    <th className="px-4 py-3">PTS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {standings.map((row, index) => (
+                    <tr
+                      key={row.teamId}
+                      className="border-t border-gray-100 text-center"
+                    >
+                      <td className="px-4 py-3 text-left font-bold text-primary-700">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 py-3 text-left font-semibold text-gray-900">
+                        {row.teamName}
+                      </td>
+                      <td className="px-4 py-3">{row.played}</td>
+                      <td className="px-4 py-3">{row.won}</td>
+                      <td className="px-4 py-3">{row.drawn}</td>
+                      <td className="px-4 py-3">{row.lost}</td>
+                      <td className="px-4 py-3">{row.goalsFor}</td>
+                      <td className="px-4 py-3">{row.goalsAgainst}</td>
+                      <td className="px-4 py-3">{row.goalDifference}</td>
+                      <td className="px-4 py-3 text-lg font-bold text-gray-950">
+                        {row.points}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <div className="mb-5">
+            <p className="text-sm font-bold uppercase tracking-wide text-primary-700">
+              HU-WEB-06
+            </p>
+            <h2 className="mt-1 text-2xl font-bold text-gray-900">
+              Calendario deportivo
+            </h2>
+            <p className="text-sm text-gray-500">
+              Consulta partidos programados por fecha.
+            </p>
+          </div>
+          <Input
+            label="Fecha"
+            type="date"
+            value={selectedCalendarDate}
+            onChange={(e) => setSelectedCalendarDate(e.target.value)}
+            fullWidth
+          />
+          <div className="mt-5 space-y-3">
+            {calendarMatches.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">
+                No hay partidos para esta fecha.
+              </div>
+            ) : (
+              calendarMatches.map((partido) => (
+                <div
+                  key={partido.id}
+                  className="rounded-lg border border-sky-100 bg-sky-50 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="rounded-lg bg-sky-700 px-3 py-2 text-sm font-bold text-white">
+                      {partido.hora || "Sin hora"}
+                    </span>
+                    <span className="text-xs font-bold uppercase text-sky-800">
+                      {partido.cancha?.nombre || "Sin cancha"}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-center font-bold text-gray-900">
+                    {getTeamName(partido.equipo_local, "Equipo local")} vs{" "}
+                    {getTeamName(partido.equipo_visitante, "Equipo visitante")}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <div className="mb-5">
+          <h2 className="mt-1 text-2xl font-bold text-gray-900">
+            Reporte resumido de equipos por torneo
+          </h2>
+          <p className="text-sm text-gray-500">
+            Resume rendimiento y proximo partido de cada equipo.
+          </p>
+        </div>
+
+        {reportRows.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 py-10 text-center text-gray-500">
+            Selecciona un torneo con resultados para ver el reporte.
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {reportRows.map((row) => (
+              <div
+                key={row.teamId}
+                className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-gray-950">{row.teamName}</h3>
+                    <p className="text-sm text-gray-500">
+                      {row.played} partidos jugados
+                    </p>
+                  </div>
+                  <span className="rounded-lg bg-primary-600 px-3 py-2 text-lg font-bold text-white">
+                    {row.points}
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
+                  <div className="rounded bg-white p-2">
+                    <p className="font-bold text-emerald-700">{row.won}</p>
+                    <p className="text-xs text-gray-500">Ganados</p>
+                  </div>
+                  <div className="rounded bg-white p-2">
+                    <p className="font-bold text-amber-700">{row.drawn}</p>
+                    <p className="text-xs text-gray-500">Empates</p>
+                  </div>
+                  <div className="rounded bg-white p-2">
+                    <p className="font-bold text-red-700">{row.lost}</p>
+                    <p className="text-xs text-gray-500">Perdidos</p>
+                  </div>
+                </div>
+                <div className="mt-4 rounded bg-white p-3 text-sm">
+                  <p className="font-semibold text-gray-700">
+                    Proximo partido
+                  </p>
+                  <p className="mt-1 text-gray-600">
+                    {row.upcoming
+                      ? `${formatFixtureDate(row.upcoming.fecha)} - ${
+                          row.upcoming.hora || "Sin hora"
+                        }`
+                      : "Sin partido pendiente"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <FixtureModal
@@ -396,14 +1215,16 @@ const FixtureModal: React.FC<FixtureModalProps> = ({
           fullWidth
           required
         />
-        <Input
-          label="Ronda"
-          type="number"
+        <Select
+          label="Etapa del torneo"
           value={formData.ronda}
           onChange={(e) => setFormData({ ...formData, ronda: e.target.value })}
+          options={roundOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+          }))}
           fullWidth
           required
-          min={1}
         />
         <Select
           label="Equipo Local"

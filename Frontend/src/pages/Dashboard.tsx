@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Layout } from "@components/layout";
 import { useAuthStore } from "@store/authStore";
-import { Card, Table } from "@components/common";
+import { Button, Card, Input, Modal, Select, Table } from "@components/common";
 import {
   BarChart3,
   Calendar,
   CheckCircle2,
   Clock,
   MapPin,
+  Send,
   Trophy,
   Users,
 } from "lucide-react";
@@ -46,6 +47,16 @@ const Dashboard: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [isRequestSubmitting, setIsRequestSubmitting] = useState(false);
+  const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestForm, setRequestForm] = useState({
+    cancha_id: "",
+    fecha: toDateKey(new Date()),
+    hora_inicio: "",
+    hora_fin: "",
+  });
 
   const isOnlyPlayer =
     Boolean(usuario?.roles.includes(UserRole.JUGADOR)) &&
@@ -62,9 +73,10 @@ const Dashboard: React.FC = () => {
         const equiposAsignados = await jugadorService.obtenerEquiposPorJugador(
           usuario.id,
         );
-        const [partidosResponse, reservasResponse] = await Promise.all([
+        const [partidosResponse, reservasResponse, canchasResponse] = await Promise.all([
           partidoService.obtenerPartidos(),
           reservaService.obtenerReservas(),
+          canchaService.obtenerCanchas(),
         ]);
         const equipoIds = new Set(equiposAsignados.map((equipo) => equipo.id));
 
@@ -85,6 +97,7 @@ const Dashboard: React.FC = () => {
             return equipoIds.has(equipoId);
           }),
         );
+        setCanchas(canchasResponse.data);
       } finally {
         setIsPlayerLoading(false);
       }
@@ -203,6 +216,18 @@ const Dashboard: React.FC = () => {
     [reservas, todayKey],
   );
 
+  const solicitudesPendientes = useMemo(
+    () =>
+      reservas
+        .filter((reserva) => reserva.estado === "pendiente")
+        .sort((a, b) =>
+          `${a.fecha} ${a.hora_inicio}`.localeCompare(
+            `${b.fecha} ${b.hora_inicio}`,
+          ),
+        ),
+    [reservas],
+  );
+
   const selectedDayMatches = partidosJugador.filter(
     (partido) => partido.fecha === selectedDateKey,
   );
@@ -234,6 +259,53 @@ const Dashboard: React.FC = () => {
     };
   };
 
+  const playerTeam = equiposJugador[0];
+
+  const handleReservationRequest = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setRequestMessage(null);
+    setRequestError(null);
+
+    if (!playerTeam) {
+      setRequestError("Necesitas estar asignado a un equipo para solicitar reserva.");
+      return;
+    }
+
+    if (!requestForm.cancha_id || !requestForm.fecha || !requestForm.hora_inicio || !requestForm.hora_fin) {
+      setRequestError("Completa cancha, fecha y horario de la solicitud.");
+      return;
+    }
+
+    setIsRequestSubmitting(true);
+    try {
+      const created = await reservaService.crearReserva({
+        cancha_id: Number(requestForm.cancha_id),
+        equipo_id: playerTeam.id,
+        fecha: requestForm.fecha,
+        hora_inicio: requestForm.hora_inicio,
+        hora_fin: requestForm.hora_fin,
+        estado: "pendiente",
+        observaciones: `Solicitud enviada por ${usuario?.nombre ?? "jugador"}`,
+      });
+
+      setReservasJugador((current) => [...current, created]);
+      setSelectedDate(new Date(`${requestForm.fecha}T00:00:00`));
+      setRequestMessage("Solicitud enviada. Un administrador o delegado puede revisarla.");
+      setRequestForm({
+        cancha_id: "",
+        fecha: requestForm.fecha,
+        hora_inicio: "",
+        hora_fin: "",
+      });
+    } catch (error: any) {
+      setRequestError(
+        error.response?.data?.message || "No se pudo enviar la solicitud de reserva.",
+      );
+    } finally {
+      setIsRequestSubmitting(false);
+    }
+  };
+
   if (isOnlyPlayer) {
     return (
       <Layout>
@@ -245,11 +317,35 @@ const Dashboard: React.FC = () => {
             aside={
               <div className="space-y-3">
                 <MiniMetric label="Equipo" value={equiposJugador[0]?.nombre ?? "Sin equipo"} />
+                <Button
+                  fullWidth
+                  onClick={() => {
+                    setRequestMessage(null);
+                    setRequestError(null);
+                    setIsRequestModalOpen(true);
+                  }}
+                  disabled={!playerTeam}
+                >
+                  <Send size={18} />
+                  Solicitar reserva
+                </Button>
                 <MiniMetric label="Partidos próximos" value={nextPlayerMatches.length} />
                 <MiniMetric label="Reservas próximas" value={nextPlayerReservations.length} />
               </div>
             }
           />
+
+          {(requestMessage || requestError) && (
+            <div
+              className={`rounded-lg border px-4 py-3 text-sm font-semibold ${
+                requestError
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              {requestError || requestMessage}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <StatCard label="Mi equipo" value={equiposJugador[0]?.nombre ?? "Sin equipo"} icon={Users} color="bg-sky-50 text-sky-700 border-sky-100" />
@@ -404,6 +500,87 @@ const Dashboard: React.FC = () => {
               isLoading={isPlayerLoading}
             />
           </div>
+
+          <Modal
+            isOpen={isRequestModalOpen}
+            onClose={() => setIsRequestModalOpen(false)}
+            title="Solicitar reserva de cancha"
+          >
+            <form onSubmit={handleReservationRequest} className="space-y-4">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                Equipo solicitante:{" "}
+                <span className="font-bold text-gray-900">
+                  {playerTeam?.nombre ?? "Sin equipo asignado"}
+                </span>
+              </div>
+              <Select
+                label="Cancha"
+                value={requestForm.cancha_id}
+                onChange={(e) =>
+                  setRequestForm({ ...requestForm, cancha_id: e.target.value })
+                }
+                options={canchas.map((cancha) => ({
+                  value: cancha.id,
+                  label: cancha.nombre,
+                }))}
+                required
+                fullWidth
+              />
+              <Input
+                label="Fecha"
+                type="date"
+                value={requestForm.fecha}
+                onChange={(e) =>
+                  setRequestForm({ ...requestForm, fecha: e.target.value })
+                }
+                required
+                fullWidth
+              />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  label="Hora inicio"
+                  type="time"
+                  value={requestForm.hora_inicio}
+                  onChange={(e) =>
+                    setRequestForm({
+                      ...requestForm,
+                      hora_inicio: e.target.value,
+                    })
+                  }
+                  required
+                  fullWidth
+                />
+                <Input
+                  label="Hora fin"
+                  type="time"
+                  value={requestForm.hora_fin}
+                  onChange={(e) =>
+                    setRequestForm({ ...requestForm, hora_fin: e.target.value })
+                  }
+                  required
+                  fullWidth
+                />
+              </div>
+              {requestError && (
+                <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                  {requestError}
+                </p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setIsRequestModalOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" isLoading={isRequestSubmitting}>
+                  <Send size={18} />
+                  Enviar solicitud
+                </Button>
+              </div>
+            </form>
+          </Modal>
         </div>
       </Layout>
     );
@@ -422,6 +599,7 @@ const Dashboard: React.FC = () => {
                 label="Canchas disponibles"
                 value={`${adminMetrics.canchasDisponibles.length}/${canchas.length}`}
               />
+              <MiniMetric label="Solicitudes pendientes" value={solicitudesPendientes.length} />
               <MiniMetric label="Partidos programados" value={proximosPartidos.length} />
               <MiniMetric label="Reservas próximas" value={proximasReservas.length} />
             </div>
@@ -546,6 +724,14 @@ const Dashboard: React.FC = () => {
             </div>
           </Card>
         </div>
+
+        {solicitudesPendientes.length > 0 && (
+          <UpcomingReservationsTable
+            title="Solicitudes de reserva pendientes"
+            data={solicitudesPendientes}
+            isLoading={isDashboardLoading}
+          />
+        )}
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <UpcomingMatchesTable
@@ -788,6 +974,11 @@ const UpcomingReservationsTable: React.FC<UpcomingReservationsTableProps> = ({
         {
           key: "cancha",
           title: "Cancha",
+          render: (value: any) => value?.nombre ?? "-",
+        },
+        {
+          key: "equipo",
+          title: "Equipo",
           render: (value: any) => value?.nombre ?? "-",
         },
         {

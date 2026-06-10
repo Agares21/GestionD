@@ -285,6 +285,9 @@ const ReservationCalendar: React.FC = () => {
                   reserva={reserva}
                   onEdit={() => openEdit(reserva)}
                   onDelete={() => eliminarReserva(reserva.id)}
+                  onConfirm={() =>
+                    actualizarReserva(reserva.id, { estado: "confirmada" })
+                  }
                   onCancel={() =>
                     cancelarReserva(reserva.id, "Cancelado por usuario")
                   }
@@ -338,6 +341,7 @@ interface ReservationItemProps {
   reserva: Reserva;
   onEdit: () => void;
   onDelete: () => void;
+  onConfirm: () => void;
   onCancel: () => void;
 }
 
@@ -345,6 +349,7 @@ const ReservationItem: React.FC<ReservationItemProps> = ({
   reserva,
   onEdit,
   onDelete,
+  onConfirm,
   onCancel,
 }) => (
   <div
@@ -386,9 +391,14 @@ const ReservationItem: React.FC<ReservationItemProps> = ({
           <Edit2 size={16} />
         </Button>
         {reserva.estado === "pendiente" && (
-          <Button variant="danger" size="sm" onClick={onCancel}>
-            Cancelar
-          </Button>
+          <>
+            <Button variant="success" size="sm" onClick={onConfirm}>
+              Confirmar
+            </Button>
+            <Button variant="danger" size="sm" onClick={onCancel}>
+              Cancelar
+            </Button>
+          </>
         )}
         <Button variant="danger" size="sm" onClick={onDelete}>
           <Trash2 size={16} />

@@ -19,6 +19,9 @@ export class Torneo {
   @Column({ length: 20 })
   tipo: string;
 
+  @Column({ length: 20, default: "planeado" })
+  estado: string;
+
   @Column()
   disciplina_id: number;
 

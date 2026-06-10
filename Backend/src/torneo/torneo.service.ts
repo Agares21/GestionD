@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { Torneo } from "./torneo.entity";
@@ -30,14 +30,21 @@ export class TorneoService {
 
   @ApiOperation({ summary: "Obtener un torneo por ID" })
   async findOne(id: number): Promise<Torneo> {
-    return await this.torneoRepository.findOne({
+    const torneo = await this.torneoRepository.findOne({
       where: { id },
       relations: ["disciplina"],
     });
+
+    if (!torneo) {
+      throw new NotFoundException("Torneo no encontrado");
+    }
+
+    return torneo;
   }
 
   @ApiOperation({ summary: "Actualizar un torneo" })
   async update(id: number, updateTorneoDto: UpdateTorneoDto): Promise<Torneo> {
+    await this.findOne(id);
     await this.torneoRepository.update(id, updateTorneoDto);
     return this.findOne(id);
   }

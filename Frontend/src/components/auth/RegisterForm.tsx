@@ -98,7 +98,17 @@ const RegisterForm: React.FC = () => {
         navigate("/login");
       }, 2000);
     } catch (err: any) {
-      setError(err.message || "Error al registrarse");
+      const conflictMessage =
+        err.response?.status === 409
+          ? "El email o carnet ya esta registrado"
+          : undefined;
+
+      setError(
+        err.response?.data?.message ||
+          conflictMessage ||
+          err.message ||
+          "Error al registrarse",
+      );
     }
   };
 

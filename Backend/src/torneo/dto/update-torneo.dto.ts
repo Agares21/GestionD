@@ -9,6 +9,9 @@ export class UpdateTorneoDto extends PartialType(CreateTorneoDto) {
   @ApiProperty({ description: "Tipo de torneo" })
   tipo?: string;
 
+  @ApiProperty({ description: "Estado del torneo" })
+  estado?: string;
+
   @ApiProperty({ description: "ID de la disciplina" })
   disciplina_id?: number;
 

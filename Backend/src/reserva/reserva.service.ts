@@ -10,8 +10,11 @@ export class ReservaService {
     private reservaRepository: Repository<Reserva>,
   ) {}
 
-  create(data: Partial<Reserva>) {
-    return this.reservaRepository.save(this.reservaRepository.create(data));
+  async create(data: Partial<Reserva>) {
+    const reserva = await this.reservaRepository.save(
+      this.reservaRepository.create(data),
+    );
+    return this.findOne(reserva.id);
   }
 
   findAll(fecha?: string, equipoId?: number) {
