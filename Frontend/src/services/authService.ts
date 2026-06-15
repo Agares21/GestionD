@@ -13,9 +13,13 @@ export interface RegisterPayload {
 
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    const normalizedCredentials = {
+      email: credentials.email.trim().toLowerCase(),
+      password: credentials.password.trim(),
+    };
     const response = await apiClient.post<AuthResponse>(
       "/auth/login",
-      credentials,
+      normalizedCredentials,
     );
     if (response.data) {
       const usuario = response.data.usuario || response.data.user;

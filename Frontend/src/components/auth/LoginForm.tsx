@@ -15,14 +15,18 @@ const LoginForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
 
-    if (!email || !password) {
+    if (!normalizedEmail || !normalizedPassword) {
       setLocalError("Por favor completa todos los campos");
       return;
     }
 
     try {
-      await login(email, password);
+      setEmail(normalizedEmail);
+      setPassword(normalizedPassword);
+      await login(normalizedEmail, normalizedPassword);
       navigate("/dashboard");
     } catch (err: any) {
       setLocalError(err.response?.data?.message || "Error al iniciar sesión");

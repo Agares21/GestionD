@@ -29,8 +29,9 @@ export class AuthService {
 
   @ApiOperation({ summary: "Validar usuario y contraseña" })
   async validateUser(email: string, password: string): Promise<any> {
+    const normalizedEmail = email.trim().toLowerCase();
     const persona = await this.personaRepository.findOne({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (!persona || !persona.password) {
@@ -109,26 +110,38 @@ export class AuthService {
     password: string,
     role?: string,
   ): Promise<Persona> {
-    if (!password) {
+    const normalizedPersonaData = {
+      ...personaData,
+      nombre: personaData.nombre?.trim(),
+      apellido: personaData.apellido?.trim(),
+      carnet: personaData.carnet?.trim(),
+      email: personaData.email?.trim().toLowerCase(),
+      celular: personaData.celular?.trim(),
+    };
+
+    if (!password?.trim()) {
       throw new BadRequestException("La contrasena es obligatoria");
     }
 
     const existingPersona = await this.personaRepository.findOne({
-      where: [{ email: personaData.email }, { carnet: personaData.carnet }],
+      where: [
+        { email: normalizedPersonaData.email },
+        { carnet: normalizedPersonaData.carnet },
+      ],
     });
 
-    if (existingPersona?.email === personaData.email) {
+    if (existingPersona?.email === normalizedPersonaData.email) {
       throw new ConflictException("El email ya esta registrado");
     }
 
-    if (existingPersona?.carnet === personaData.carnet) {
+    if (existingPersona?.carnet === normalizedPersonaData.carnet) {
       throw new ConflictException("El carnet ya esta registrado");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password.trim(), 10);
 
     const persona = this.personaRepository.create({
-      ...personaData,
+      ...normalizedPersonaData,
       password: hashedPassword,
     });
 

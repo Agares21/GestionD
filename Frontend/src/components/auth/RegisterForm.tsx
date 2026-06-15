@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@store/authStore";
-import { Button, Input, Alert, Select } from "@components/common";
+import { Alert, Button, Input, Select } from "@components/common";
 import { authService } from "@services/authService";
 
 interface RegisterFormData {
@@ -32,71 +32,85 @@ const RegisterForm: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
+    const { name, value } = event.target;
+    setFormData((current) => ({
+      ...current,
       [name]: value,
     }));
   };
 
-  const validateForm = (): boolean => {
+  const normalizeForm = (): RegisterFormData => ({
+    ...formData,
+    nombre: formData.nombre.trim(),
+    apellido: formData.apellido.trim(),
+    carnet: formData.carnet.trim(),
+    email: formData.email.trim().toLowerCase(),
+    celular: formData.celular.trim(),
+    password: formData.password.trim(),
+    passwordConfirm: formData.passwordConfirm.trim(),
+  });
+
+  const validateForm = (data: RegisterFormData): boolean => {
     if (
-      !formData.nombre ||
-      !formData.apellido ||
-      !formData.carnet ||
-      !formData.email ||
-      !formData.celular ||
-      !formData.password ||
-      !formData.passwordConfirm
+      !data.nombre ||
+      !data.apellido ||
+      !data.carnet ||
+      !data.email ||
+      !data.celular ||
+      !data.password ||
+      !data.passwordConfirm
     ) {
       setError("Por favor completa todos los campos");
       return false;
     }
 
-    if (!formData.email.includes("@ucb.edu.bo")) {
+    if (!data.email.endsWith("@ucb.edu.bo")) {
       setError("El email debe ser del dominio @ucb.edu.bo");
       return false;
     }
 
-    if (formData.password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+    if (data.password.length < 6) {
+      setError("La contrasena debe tener al menos 6 caracteres");
       return false;
     }
 
-    if (formData.password !== formData.passwordConfirm) {
-      setError("Las contraseñas no coinciden");
+    if (data.password !== data.passwordConfirm) {
+      setError("Las contrasenas no coinciden");
       return false;
     }
 
     return true;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
     setSuccess(null);
 
-    if (!validateForm()) {
+    const normalizedData = normalizeForm();
+    setFormData(normalizedData);
+
+    if (!validateForm(normalizedData)) {
       return;
     }
 
     try {
       await authService.register({
-        nombre: formData.nombre,
-        apellido: formData.apellido,
-        carnet: formData.carnet,
-        email: formData.email,
-          celular: formData.celular,
-          rol: formData.rol,
-          password: formData.password,
+        nombre: normalizedData.nombre,
+        apellido: normalizedData.apellido,
+        carnet: normalizedData.carnet,
+        email: normalizedData.email,
+        celular: normalizedData.celular,
+        rol: normalizedData.rol,
+        password: normalizedData.password,
       });
 
-      setSuccess("¡Registro exitoso! Redirigiendo al login...");
+      setSuccess("Registro exitoso. Redirigiendo al login...");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1500);
     } catch (err: any) {
       const conflictMessage =
         err.response?.status === 409
@@ -113,14 +127,12 @@ const RegisterForm: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 to-secondary-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-          ⚽ Registro
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-600 to-secondary-600 p-4">
+      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
+        <h1 className="mb-2 text-center text-3xl font-bold text-gray-900">
+          Registro
         </h1>
-        <p className="text-gray-600 text-center mb-8">
-          Crear nueva cuenta
-        </p>
+        <p className="mb-8 text-center text-gray-600">Crear nueva cuenta</p>
 
         {error && (
           <Alert
@@ -141,7 +153,7 @@ const RegisterForm: React.FC = () => {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Input
               label="Nombre"
               type="text"
@@ -158,7 +170,7 @@ const RegisterForm: React.FC = () => {
               name="apellido"
               value={formData.apellido}
               onChange={handleChange}
-              placeholder="Pérez"
+              placeholder="Perez"
               required
             />
           </div>
@@ -211,23 +223,23 @@ const RegisterForm: React.FC = () => {
           />
 
           <Input
-            label="Contraseña"
+            label="Contrasena"
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
-            placeholder="••••••••"
+            placeholder="********"
             fullWidth
             required
           />
 
           <Input
-            label="Confirmar Contraseña"
+            label="Confirmar contrasena"
             type="password"
             name="passwordConfirm"
             value={formData.passwordConfirm}
             onChange={handleChange}
-            placeholder="••••••••"
+            placeholder="********"
             fullWidth
             required
           />
@@ -245,12 +257,12 @@ const RegisterForm: React.FC = () => {
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            ¿Ya tienes cuenta?{" "}
+            Ya tienes cuenta?{" "}
             <Link
               to="/login"
-              className="text-primary-600 hover:text-primary-700 font-semibold"
+              className="font-semibold text-primary-600 hover:text-primary-700"
             >
-              Inicia sesión
+              Inicia sesion
             </Link>
           </p>
         </div>

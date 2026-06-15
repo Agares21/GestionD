@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
+import { RegisterDto } from "./dto/register.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import {
   ApiTags,
@@ -31,18 +32,7 @@ export class AuthController {
   @Post("register")
   @ApiOperation({ summary: "Registrar nuevo usuario" })
   @ApiResponse({ status: 201, description: "Usuario registrado exitosamente" })
-  async register(
-    @Body()
-    registerData: {
-      nombre: string;
-      apellido: string;
-      carnet: string;
-      email: string;
-      celular: string;
-      password: string;
-      rol?: string;
-    },
-  ) {
+  async register(@Body() registerData: RegisterDto) {
     const { password, rol, ...personaData } = registerData;
     const persona = await this.authService.register(personaData, password, rol);
     return {
